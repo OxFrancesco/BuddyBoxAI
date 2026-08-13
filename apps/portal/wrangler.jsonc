@@ -1,0 +1,12 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ichef-portal",
+  "compatibility_date": "2026-08-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "vars": {
+    "CLERK_PUBLISHABLE_KEY": "pk_test_bGVhZGluZy1oZW4tNjcuY2xlcmsuYWNjb3VudHMuZGV2JA",
+    "CONVEX_URL": "https://wry-meerkat-833.convex.cloud"
+  },
+  "observability": { "enabled": true }
+}

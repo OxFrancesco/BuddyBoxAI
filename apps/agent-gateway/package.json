@@ -1,0 +1,21 @@
+{
+  "name": "@ichef/agent-gateway",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8788",
+    "deploy": "wrangler deploy",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p tsconfig.test.json && tsc --noEmit -p runner/tsconfig.json",
+    "cf-typegen": "wrangler types"
+  },
+  "dependencies": {
+    "@cloudflare/sandbox": "0.12.6"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.113.0"
+  }
+}

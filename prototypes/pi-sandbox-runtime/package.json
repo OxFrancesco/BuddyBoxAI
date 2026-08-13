@@ -1,0 +1,21 @@
+{
+  "name": "@ichef/prototype-pi-sandbox-runtime",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8877",
+    "probe": "bun scripts/probe.ts",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p runner/tsconfig.json"
+  },
+  "dependencies": {
+    "@cloudflare/containers": "^0.3.5",
+    "@cloudflare/sandbox": "0.12.6"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260804.1",
+    "@types/bun": "^1.2.20",
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.113.0"
+  }
+}

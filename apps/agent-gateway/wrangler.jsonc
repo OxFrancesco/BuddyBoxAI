@@ -1,0 +1,31 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "ichef-agent-gateway",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-13",
+  "compatibility_flags": ["nodejs_compat"],
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+  },
+  "services": [
+    { "binding": "CONTROL_PLANE", "service": "ichef-control-plane" },
+    { "binding": "CREDENTIAL_BROKER", "service": "ichef-credential-broker" }
+  ],
+  "r2_buckets": [
+    { "binding": "CHECKPOINTS", "bucket_name": "ichef-agent-checkpoints" }
+  ],
+  "containers": [
+    {
+      "class_name": "Sandbox",
+      "image": "./Dockerfile",
+      "instance_type": "lite",
+      "max_instances": 10
+    }
+  ],
+  "durable_objects": {
+    "bindings": [{ "class_name": "Sandbox", "name": "Sandbox" }]
+  },
+  "migrations": [{ "new_sqlite_classes": ["Sandbox"], "tag": "v1" }]
+}

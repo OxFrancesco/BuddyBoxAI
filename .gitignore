@@ -1,0 +1,37 @@
+# Dependencies and build output
+node_modules/
+dist/
+.output/
+.tanstack/
+coverage/
+*.tsbuildinfo
+
+# Local credentials and provider state
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+!apps/portal/.env.production
+.clerk/
+.convex/
+.wrangler/
+.dev.vars
+.dev.vars.*
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa
+id_rsa.*
+
+# Local tools and operating-system files
+.DS_Store
+.idea/
+.vscode/
+*.log
+
+# Planning and read-only codeview material
+.scratch/
+resources/

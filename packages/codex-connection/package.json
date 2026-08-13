@@ -1,0 +1,22 @@
+{
+  "name": "@ichef/codex-connection",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./openai": "./src/openai.ts",
+    "./crypto": "./src/crypto.ts",
+    "./redaction": "./src/redaction.ts"
+  },
+  "scripts": {
+    "test": "bun test",
+    "typecheck": "bunx tsc --noEmit",
+    "verify": "bun run typecheck && bun test"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.3.14",
+    "@types/node": "^24.3.0",
+    "typescript": "^5.9.3"
+  }
+}
