@@ -4,6 +4,17 @@
   "compatibility_date": "2026-08-13",
   "compatibility_flags": ["nodejs_compat"],
   "main": "@tanstack/react-start/server-entry",
+  "workers_dev": false,
+  "routes": [
+    {
+      "pattern": "ichef.buddytools.org",
+      "custom_domain": true
+    },
+    {
+      "pattern": "ichef.buddytools.org/*",
+      "zone_name": "buddytools.org"
+    }
+  ],
   "vars": {
     "CLERK_PUBLISHABLE_KEY": "pk_test_bGVhZGluZy1oZW4tNjcuY2xlcmsuYWNjb3VudHMuZGV2JA",
     "CONVEX_URL": "https://wry-meerkat-833.convex.cloud"

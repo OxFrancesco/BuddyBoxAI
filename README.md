@@ -1,6 +1,6 @@
 # iChef
 
-> Deployed technical preview · [live portal](https://ichef-portal.oddofrancesco000.workers.dev)
+> Deployed technical preview · [live portal](https://ichef.buddytools.org)
 
 iChef is the deployed foundation of an iMessage-first coding agent for creating and operating owned
 TanStack Start, Clerk, and Convex websites. A user signs in through Clerk,
@@ -33,7 +33,7 @@ operations cross typed gateways and are audited in Convex.
 
 ## Deployed control plane
 
-- Portal: `https://ichef-portal.oddofrancesco000.workers.dev`
+- Portal: `https://ichef.buddytools.org`
 - Sandbox gateway: `https://ichef-agent-gateway.oddofrancesco000.workers.dev`
 - Convex production: `https://wry-meerkat-833.convex.cloud`
 - R2 checkpoints: `ichef-agent-checkpoints`
