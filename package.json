@@ -8,6 +8,7 @@
     "apps/*",
     "apps/*/runner",
     "packages/*",
+    "prototypes/*",
     "starters/*"
   ],
   "scripts": {

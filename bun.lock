@@ -152,6 +152,20 @@
         "typescript": "^5.9.3",
       },
     },
+    "prototypes/pi-sandbox-runtime": {
+      "name": "@ichef/prototype-pi-sandbox-runtime",
+      "dependencies": {
+        "@cloudflare/containers": "^0.3.5",
+        "@cloudflare/sandbox": "0.12.6",
+      },
+      "devDependencies": {
+        "@cloudflare/workers-types": "^5.20260804.1",
+        "@types/bun": "^1.2.20",
+        "@types/node": "^24.3.0",
+        "typescript": "^5.9.3",
+        "wrangler": "^4.113.0",
+      },
+    },
     "starters/tanstack-clerk-convex": {
       "name": "@ichef/starter-tanstack-clerk-convex",
       "version": "0.1.0",
@@ -389,6 +403,8 @@
     "@ichef/credential-broker": ["@ichef/credential-broker@workspace:apps/credential-broker"],
 
     "@ichef/portal": ["@ichef/portal@workspace:apps/portal"],
+
+    "@ichef/prototype-pi-sandbox-runtime": ["@ichef/prototype-pi-sandbox-runtime@workspace:prototypes/pi-sandbox-runtime"],
 
     "@ichef/provisioning": ["@ichef/provisioning@workspace:packages/provisioning"],
 
