@@ -166,6 +166,17 @@
         "wrangler": "^4.113.0",
       },
     },
+    "prototypes/pi-sandbox-runtime/runner": {
+      "name": "@ichef/prototype-pi-runner",
+      "dependencies": {
+        "@earendil-works/pi-ai": "0.84.0",
+        "@earendil-works/pi-coding-agent": "0.84.0",
+      },
+      "devDependencies": {
+        "@types/bun": "^1.2.20",
+        "typescript": "^5.9.3",
+      },
+    },
     "starters/tanstack-clerk-convex": {
       "name": "@ichef/starter-tanstack-clerk-convex",
       "version": "0.1.0",
@@ -403,6 +414,8 @@
     "@ichef/credential-broker": ["@ichef/credential-broker@workspace:apps/credential-broker"],
 
     "@ichef/portal": ["@ichef/portal@workspace:apps/portal"],
+
+    "@ichef/prototype-pi-runner": ["@ichef/prototype-pi-runner@workspace:prototypes/pi-sandbox-runtime/runner"],
 
     "@ichef/prototype-pi-sandbox-runtime": ["@ichef/prototype-pi-sandbox-runtime@workspace:prototypes/pi-sandbox-runtime"],
 
