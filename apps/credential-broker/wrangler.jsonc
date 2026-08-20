@@ -5,7 +5,8 @@
   "compatibility_date": "2026-08-13",
   "workers_dev": false,
   "vars": {
-    "CONVEX_CREDENTIAL_URL": "https://wry-meerkat-833.convex.site/v1/credentials/codex"
+    "CONVEX_CREDENTIAL_URL": "https://wry-meerkat-833.convex.site/v1/credentials/codex",
+    "CONVEX_GITHUB_CREDENTIAL_URL": "https://wry-meerkat-833.convex.site/v1/credentials/github"
   },
   "services": [{ "binding": "CONTROL_PLANE", "service": "ichef-control-plane" }],
   "observability": { "enabled": true }

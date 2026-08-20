@@ -58,6 +58,26 @@ export interface ReplacementRequest {
   nextGeneration: number;
 }
 
+export interface SiteDeploymentRequest {
+  releaseId: string;
+  commitSha: string;
+  hostname: string;
+  assets: Array<{ path: string; workspacePath: string; sha256: string }>;
+}
+
+export async function artifactManifestDigest(
+  assets: ReadonlyArray<Pick<SiteDeploymentRequest["assets"][number], "path" | "sha256">>,
+): Promise<string> {
+  const canonical = JSON.stringify({
+    version: 1,
+    assets: assets
+      .map(({ path, sha256 }) => ({ path, sha256 }))
+      .toSorted((left, right) => left.path.localeCompare(right.path)),
+  });
+  const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(canonical)));
+  return Array.from(digest, (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 export interface PublicRuntimeEvent {
   protocolVersion: typeof RUNTIME_PROTOCOL_VERSION;
   sequence: number;
@@ -204,6 +224,46 @@ export function parseScreenshot(value: unknown): ScreenshotRequest {
   const path = optionalString(body, "path", { max: 512 }) ?? "/";
   if (!path.startsWith("/") || path.startsWith("//")) throw new Error("path must be an absolute URL path.");
   return { port: Number(port), path, width: Number(width), height: Number(height) };
+}
+
+export function parseSiteDeployment(value: unknown): SiteDeploymentRequest {
+  const body = record(value);
+  if (!body) throw new Error("Deployment body must be a JSON object.");
+  if (!Array.isArray(body.assets) || body.assets.length === 0 || body.assets.length > 256) {
+    throw new Error("assets must contain between 1 and 256 files.");
+  }
+  const assets = body.assets.map((candidate) => {
+    const asset = record(candidate);
+    if (!asset) throw new Error("Each asset must be a JSON object.");
+    const path = requiredString(asset, "path", { max: 240 });
+    const workspacePath = requiredString(asset, "workspacePath", { max: 512 });
+    const sha256 = requiredString(asset, "sha256", { max: 64, pattern: /^[a-f0-9]{64}$/ });
+    for (const [label, candidatePath] of [["path", path], ["workspacePath", workspacePath]] as const) {
+      if (
+        candidatePath.startsWith("/") || candidatePath.includes("\\") || candidatePath.includes("%") ||
+        candidatePath.includes("//") || candidatePath.split("/").some((segment) => segment === "" || segment === "." || segment === "..") ||
+        /[^A-Za-z0-9._@+/-]/.test(candidatePath)
+      ) throw new Error(`${label} has an invalid format.`);
+    }
+    if (path.startsWith(".") || path.split("/").some((segment) => segment.startsWith("."))) {
+      throw new Error("Hidden deployment assets are not allowed.");
+    }
+    return { path, workspacePath, sha256 };
+  });
+  if (new Set(assets.map((asset) => asset.path)).size !== assets.length) {
+    throw new Error("Deployment asset paths must be unique.");
+  }
+  const hostname = requiredString(body, "hostname", {
+    max: 253,
+    pattern: /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?-ichef-sites\.buddytools\.org$/,
+  });
+  if ((hostname.split(".")[0]?.length ?? 64) > 63) throw new Error("hostname label is too long.");
+  return {
+    releaseId: requiredString(body, "releaseId", { max: 128, pattern: identifierPattern }),
+    commitSha: requiredString(body, "commitSha", { max: 64, pattern: /^[a-f0-9]{7,64}$/ }),
+    hostname,
+    assets,
+  };
 }
 
 export function parseReplacement(value: unknown): ReplacementRequest {

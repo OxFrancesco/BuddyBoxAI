@@ -38,6 +38,7 @@ import type * as runs from "../runs.js";
 import type * as runtime from "../runtime.js";
 import type * as usage from "../usage.js";
 import type * as users from "../users.js";
+import type * as xchat from "../xchat.js";
 
 import type {
   ApiFromModules,
@@ -76,6 +77,7 @@ declare const fullApi: ApiFromModules<{
   runtime: typeof runtime;
   usage: typeof usage;
   users: typeof users;
+  xchat: typeof xchat;
 }>;
 
 /**

@@ -1,0 +1,26 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  "name": "ichef-site-host",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-14",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "routes": [
+    { "pattern": "*-ichef-sites.buddytools.org/*", "zone_name": "buddytools.org" }
+  ],
+  "r2_buckets": [
+    { "binding": "SITE_ASSETS", "bucket_name": "ichef-sites" }
+  ],
+  "services": [
+    { "binding": "CONTROL_PLANE", "service": "ichef-control-plane" }
+  ],
+  "vars": {
+    "CONVEX_SITE_HOST_URL": "https://wry-meerkat-833.convex.site/v1/site-host/broker",
+    "SITES_BASE_DOMAIN": "ichef-sites.buddytools.org"
+  },
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "head_sampling_rate": 1 },
+    "traces": { "enabled": true, "head_sampling_rate": 0.05 }
+  }
+}

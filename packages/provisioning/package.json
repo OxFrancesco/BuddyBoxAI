@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "exports": { ".": "./src/index.ts", "./github": "./src/github.ts" },
+  "exports": { ".": "./src/index.ts", "./github": "./src/github.ts", "./github-egress": "./src/github-egress.ts" },
   "scripts": {
     "test": "bun test",
     "typecheck": "tsc --noEmit",

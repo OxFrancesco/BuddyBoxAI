@@ -48,6 +48,17 @@ async function consumeApproval(
   if (approval.status !== "pending" || approval.expiresAt <= Date.now()) {
     throw new ConvexError({ code: "APPROVAL_UNAVAILABLE", message: "Approval is expired or unavailable" });
   }
+  let actor: "user" | "imessage" | "xchat" = "user";
+  if (args.deliveryId) {
+    const delivery = await ctx.db.get(args.deliveryId);
+    if (!delivery || delivery.ownerId !== args.ownerId) {
+      throw new ConvexError({
+        code: "DELIVERY_NOT_FOUND",
+        message: "Channel delivery not found",
+      });
+    }
+    actor = delivery.provider === "xchat" ? "xchat" : "imessage";
+  }
   const now = Date.now();
   await ctx.db.patch(approval._id, {
     status: "consumed",
@@ -57,7 +68,7 @@ async function consumeApproval(
   });
   await writeAudit(ctx, {
     ownerId: approval.ownerId,
-    actor: args.deliveryId ? "imessage" : "user",
+    actor,
     action: "approval.consumed",
     targetType: "approval",
     targetId: approval._id,

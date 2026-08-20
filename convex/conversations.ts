@@ -3,13 +3,15 @@ import { ConvexError, v } from "convex/values";
 import { internalMutation, query } from "./_generated/server";
 import { assertOwner, requireCurrentUser } from "./lib/auth";
 import { boundedLimit, requireBoundedString } from "./lib/bounds";
-import { conversationStatusValidator } from "./modelValidators";
+import { channelValidator, conversationStatusValidator } from "./modelValidators";
 
 const conversationValidator = v.object({
   _id: v.id("conversations"),
   _creationTime: v.number(),
   projectId: v.optional(v.id("projects")),
   imessageConnectionId: v.optional(v.id("imessageConnections")),
+  xchatConnectionId: v.optional(v.id("xchatConnections")),
+  channel: v.optional(channelValidator),
   status: conversationStatusValidator,
   title: v.optional(v.string()),
   createdAt: v.number(),
@@ -39,6 +41,7 @@ export const openForChannel = internalMutation({
       ownerId: args.ownerId,
       projectId: args.projectId,
       imessageConnectionId: args.imessageConnectionId,
+      channel: "imessage",
       status: "open",
       title: args.title ? requireBoundedString(args.title, "title", 160) : undefined,
       createdAt: now,
@@ -61,8 +64,8 @@ export const listMine = query({
       : await ctx.db.query("conversations")
           .withIndex("by_owner_id_and_updated_at", (q) => q.eq("ownerId", user._id))
           .order("desc").take(limit);
-    return rows.map(({ _id, _creationTime, projectId, imessageConnectionId, status, title, createdAt, updatedAt }) => ({
-      _id, _creationTime, projectId, imessageConnectionId, status, title, createdAt, updatedAt,
+    return rows.map(({ _id, _creationTime, projectId, imessageConnectionId, xchatConnectionId, channel, status, title, createdAt, updatedAt }) => ({
+      _id, _creationTime, projectId, imessageConnectionId, xchatConnectionId, channel, status, title, createdAt, updatedAt,
     }));
   },
 });

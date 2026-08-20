@@ -87,4 +87,33 @@ describe("bridge HTTP seam", () => {
     expect((await handler(request)).status).toBe(401);
     expect(delivered).toBe(false);
   });
+
+  test("returns a non-retryable conflict when outbound delivery needs reconciliation", async () => {
+    const handler = createRequestHandler({
+      bridge: fakeBridge({
+        deliverOutbound: async () => ({ status: "reconciliation_required" }),
+      }),
+      addressPepper: "address_pepper_that_is_long_enough",
+      internalSecret: "internal_secret_value",
+      webhookSecurity: { signingSecret: WEBHOOK_SECRET, now: () => NOW },
+    });
+    const request = new Request("https://bridge.example/v1/outbound", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        authorization: "Bearer internal_secret_value",
+      },
+      body: JSON.stringify({
+        outboundId: "delivery-out-ambiguous-1",
+        idempotencyKey: "outbound:delivery-out-ambiguous-1",
+        spaceId: "opaque-space",
+        text: "Your preview is ready.",
+      }),
+    });
+
+    const response = await handler(request);
+    expect(response.status).toBe(409);
+    expect(await response.json()).toEqual({ status: "reconciliation_required" });
+    expect(response.headers.get("retry-after")).toBeNull();
+  });
 });

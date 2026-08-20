@@ -33,9 +33,13 @@ const challengeResultSchema = z.discriminatedUnion("status", [
 ]);
 
 const outboundClaimSchema = z.discriminatedUnion("status", [
-  z.object({ status: z.literal("claimed") }),
+  z.object({
+    status: z.literal("claimed"),
+    leaseToken: z.string().min(32).max(256),
+  }),
   z.object({ status: z.literal("already_delivered") }),
   z.object({ status: z.literal("in_flight") }),
+  z.object({ status: z.literal("reconciliation_required") }),
 ]);
 
 const emptyResultSchema = z.union([z.null(), z.object({}).strict()]);

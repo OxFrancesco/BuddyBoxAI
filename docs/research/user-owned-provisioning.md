@@ -2,20 +2,37 @@
 
 _Research current as of 2026-08-13. Sources are vendor documentation and official source repositories._
 
+> Product decision, 2026-08-14: iChef's beta uses centrally managed Cloudflare
+> hosting. Users do not connect a Cloudflare account. The Cloudflare research
+> below is retained for a possible future bring-your-own-cloud option, not the
+> current onboarding or readiness model.
+
 ## Executive answer
 
-iChef can keep the generated product in the customer's accounts for GitHub, Cloudflare, and Convex without handing durable provider credentials to Pi or a Cloudflare Sandbox. Clerk is the exception: its public product surface does not currently document delegated workspace administration. A fully automatic, persistently manageable Clerk application in the user's workspace therefore requires admission to Clerk's private-beta Platform API or a claim/transfer handoff that ends iChef's control.
+iChef keeps source repositories in the User's GitHub account and backends in the
+User's Convex team while centrally hosting beta releases in iChef's Cloudflare
+account. Durable provider credentials are never handed to Pi or a Cloudflare
+Sandbox. Clerk is the exception: its public product surface does not currently
+document delegated workspace administration. A fully automatic, persistently
+manageable Clerk application in the user's workspace therefore requires
+admission to Clerk's private-beta Platform API or a claim/transfer handoff that
+ends iChef's control.
 
 | Resource | User-owned automation | Delegated authorization | MVP verdict |
 | --- | --- | --- | --- |
 | GitHub repository | Yes | GitHub App installation token; optional user access token | Supported |
-| Cloudflare Worker and related resources | Yes | Public third-party OAuth; API token fallback | Supported, but deploy by REST rather than Workers Builds |
+| Cloudflare Worker and related resources | iChef-owned during beta | Operator credential behind the deployment gateway | No User connection or OAuth gate |
 | Convex project/deployments | Yes | Convex OAuth application or team/project token | Supported; Management API is beta |
 | Clerk application | Partly | No documented public workspace-admin OAuth; Platform API token is private beta | Use claimable app/handoff or obtain beta access |
 
 ## Recommended ownership and credential model
 
-Each production project should consist of a repository in the user's GitHub account or organization, a Worker in the user's selected Cloudflare account, and a project in the user's Convex team. A Clerk application should become user-owned at claim/transfer time. iChef should own only its control plane, encrypted connection records, temporary build artifacts, and explicitly labeled preview infrastructure.
+Each beta project consists of a repository in the User's GitHub account or
+organization, an iChef-hosted release, and a project in the User's Convex team.
+A Clerk application should become User-owned at claim/transfer time. iChef owns
+its control plane, encrypted connection records, temporary build artifacts, and
+managed preview/release hosting. The reserved managed hostname convention is
+`<project>-ichef-sites.buddytools.org`; collision suffixes must be stable.
 
 Pi and the Cloudflare Sandbox should receive source plus task-scoped capabilities, never standing GitHub, Cloudflare, Convex, or Clerk credentials. Trusted provider gateways should mint or refresh credentials just in time, perform typed operations such as `pushCommit`, `deployWorker`, and `deployConvex`, and record immutable audit data. This boundary matters even in “YOLO” agent mode: broad agent autonomy does not require broad provider credentials.
 
@@ -33,7 +50,12 @@ Practical blockers are organizational policy and account binding. An app request
 
 **MVP:** generate a private repository from the iChef template under the selected account, retain installation/account/repository IDs, and let the Git gateway mint destination-scoped IATs for each push. Request a user access token only if user attribution or an endpoint unavailable to IATs is actually needed.
 
-## 2. Cloudflare Workers and infrastructure
+## 2. Cloudflare Workers and infrastructure (future BYO-cloud option)
+
+This section describes a technically viable future option. It is not part of
+current onboarding. During the beta, iChef's trusted deployment gateway uses an
+operator credential to publish approved releases in iChef's account. The
+general Pi sandbox never receives that credential.
 
 Cloudflare now provides third-party OAuth on every plan specifically so integrations do not need customers to share long-lived API tokens ([Cloudflare OAuth overview](https://developers.cloudflare.com/fundamentals/oauth/)). iChef should register a server-side Authorization Code client and request `offline_access` when background refresh is required. Third-party clients support Authorization Code rather than client-credentials or device grants; a new client is private to the parent account until made public. Public clients require verified publisher details and declared scopes, and public visibility is irreversible ([Create a Cloudflare OAuth client](https://developers.cloudflare.com/fundamentals/oauth/create-an-oauth-client/)). Authorization, token, revocation, and user-info endpoints are documented by Cloudflare ([Integrate with Cloudflare OAuth](https://developers.cloudflare.com/fundamentals/oauth/integrate-with-cloudflare/)).
 
@@ -86,8 +108,11 @@ Incoming messages carry a platform user/address and message ID, not an authentic
 1. Connect Clerk web identity to the iMessage address with an authenticated, expiring challenge; never treat an inbound address as login proof by itself.
 2. Install the GitHub App, validate the installation against the logged-in GitHub principal, and generate the user's private repository from the iChef template.
 3. Authorize Convex project-scoped access and create/select a user-owned project.
-4. Authorize Cloudflare through public OAuth, select the account, and deploy directly through the trusted gateway.
+4. Allocate an iChef-managed hostname and deploy the approved release through the trusted Cloudflare gateway; require no User Cloudflare connection.
 5. Create a keyless Clerk preview and hand the claim URL to the authenticated user. Gate “fully managed user-owned Clerk production” behind Platform API access.
 6. Run Pi in a credential-free Cloudflare Sandbox. Provider gateways alone push and deploy, even when the user's project policy auto-approves those actions.
 
-The hard launch dependencies are approval of the public Cloudflare OAuth client, Convex OAuth verification before scale, organization-owner approval for GitHub installations where required, and either Clerk Platform API access or honest product UX for the Clerk claim/production handoff.
+The hard launch dependencies are iChef-managed hostname routing and certificate
+automation, Convex OAuth verification before scale, organization-owner approval
+for GitHub installations where required, and either Clerk Platform API access
+or honest product UX for the Clerk claim/production handoff.

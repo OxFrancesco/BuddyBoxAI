@@ -10,6 +10,7 @@ const entityId = (prefix: string) =>
 
 export const userIdSchema = entityId("user_");
 export const iMessageConnectionIdSchema = entityId("imessage_");
+export const xChatConnectionIdSchema = entityId("xchat_");
 export const serviceConnectionIdSchema = entityId("service_");
 export const proposedProjectIdSchema = entityId("proposal_");
 export const projectIdSchema = entityId("project_");
@@ -57,6 +58,27 @@ export const iMessageConnectionSchema = z
 
 export type IMessageConnection = z.infer<typeof iMessageConnectionSchema>;
 
+export const xChatConnectionSchema = z
+  .object({
+    id: xChatConnectionIdSchema,
+    userId: userIdSchema,
+    accountIdHash: z.string().min(16).max(255),
+    status: z.enum(["pending", "verified", "revoked"]),
+    verifiedAt: timestamp.nullable().optional(),
+    ...timestamps,
+  })
+  .strict()
+  .superRefine((connection, context) => {
+    if (connection.status === "verified" && !connection.verifiedAt) {
+      context.addIssue({ code: "custom", path: ["verifiedAt"], message: "a verified X Chat Connection needs verifiedAt" });
+    }
+    if (connection.status === "pending" && connection.verifiedAt) {
+      context.addIssue({ code: "custom", path: ["verifiedAt"], message: "a pending X Chat Connection is not verified" });
+    }
+  });
+
+export type XChatConnection = z.infer<typeof xChatConnectionSchema>;
+
 export const serviceProviderSchema = z.enum(["chatgpt", "github", "cloudflare", "convex", "openrouter"]);
 export type ServiceProvider = z.infer<typeof serviceProviderSchema>;
 
@@ -76,9 +98,9 @@ export const serviceConnectionSchema = z
 
 export type ServiceConnection = z.infer<typeof serviceConnectionSchema>;
 
-export const REQUIRED_PROJECT_SERVICE_PROVIDERS = ["chatgpt", "github", "cloudflare", "convex"] as const;
+export const REQUIRED_PROJECT_SERVICE_PROVIDERS = ["chatgpt", "github", "convex"] as const;
 export const projectReadinessRequirementSchema = z.enum([
-  "verified-imessage",
+  "verified-messaging",
   ...REQUIRED_PROJECT_SERVICE_PROVIDERS,
 ]);
 export type ProjectReadinessRequirement = z.infer<typeof projectReadinessRequirementSchema>;
@@ -90,13 +112,17 @@ export type ProjectReadiness =
 export function evaluateProjectReadiness(input: {
   userId: string;
   iMessageConnections: readonly IMessageConnection[];
+  xChatConnections?: readonly XChatConnection[];
   serviceConnections: readonly ServiceConnection[];
 }): ProjectReadiness {
   const missing: ProjectReadinessRequirement[] = [];
   const ownsVerifiedIMessage = input.iMessageConnections.some(
     (connection) => connection.userId === input.userId && connection.status === "verified",
   );
-  if (!ownsVerifiedIMessage) missing.push("verified-imessage");
+  const ownsVerifiedXChat = (input.xChatConnections ?? []).some(
+    (connection) => connection.userId === input.userId && connection.status === "verified",
+  );
+  if (!ownsVerifiedIMessage && !ownsVerifiedXChat) missing.push("verified-messaging");
 
   for (const provider of REQUIRED_PROJECT_SERVICE_PROVIDERS) {
     const ownsHealthyConnection = input.serviceConnections.some(

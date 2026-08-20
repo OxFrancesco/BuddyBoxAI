@@ -9,6 +9,7 @@ import {
   iMessageConnectionStatusValidator,
   serviceConnectionStatusValidator,
   serviceProviderValidator,
+  xchatConnectionStatusValidator,
 } from "./modelValidators";
 
 const serviceConnectionValidator = v.object({
@@ -35,19 +36,30 @@ const imessageConnectionValidator = v.object({
   updatedAt: v.number(),
 });
 
+const xchatConnectionValidator = v.object({
+  _id: v.id("xchatConnections"),
+  _creationTime: v.number(),
+  maskedSender: v.string(),
+  status: xchatConnectionStatusValidator,
+  verifiedAt: v.optional(v.number()),
+  activeProjectId: v.optional(v.id("projects")),
+  createdAt: v.number(),
+  updatedAt: v.number(),
+});
+
 export const listMine = query({
   args: {},
   returns: v.object({
     imessage: v.array(imessageConnectionValidator),
+    xchat: v.array(xchatConnectionValidator),
     services: v.array(serviceConnectionValidator),
     readiness: v.object({
       ready: v.boolean(),
       missing: v.array(
         v.union(
-          v.literal("imessage"),
+          v.literal("messaging"),
           v.literal("chatgpt"),
           v.literal("github"),
-          v.literal("cloudflare"),
           v.literal("convex"),
         ),
       ),
@@ -64,11 +76,26 @@ export const listMine = query({
       .query("serviceConnections")
       .withIndex("by_owner_id_and_status", (q) => q.eq("ownerId", user._id))
       .take(20);
+    const xchat = await ctx.db
+      .query("xchatConnections")
+      .withIndex("by_owner_id_and_created_at", (q) => q.eq("ownerId", user._id))
+      .order("desc")
+      .take(20);
     return {
       imessage: imessage.map((connection) => ({
         _id: connection._id,
         _creationTime: connection._creationTime,
         maskedAddress: connection.maskedAddress,
+        status: connection.status,
+        verifiedAt: connection.verifiedAt,
+        activeProjectId: connection.activeProjectId,
+        createdAt: connection.createdAt,
+        updatedAt: connection.updatedAt,
+      })),
+      xchat: xchat.map((connection) => ({
+        _id: connection._id,
+        _creationTime: connection._creationTime,
+        maskedSender: connection.maskedSender,
         status: connection.status,
         verifiedAt: connection.verifiedAt,
         activeProjectId: connection.activeProjectId,

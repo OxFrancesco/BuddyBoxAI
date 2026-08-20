@@ -196,6 +196,60 @@ export const loadCredential = internalQuery({
   },
 });
 
+export const loadGitHubInstallationBinding = internalQuery({
+  args: { ownerId: v.id("users"), projectId: v.id("projects") },
+  returns: v.union(
+    v.object({ status: v.literal("missing") }),
+    v.object({ status: v.literal("reauth") }),
+    v.object({
+      status: v.literal("ok"),
+      externalAccountRefCiphertext: v.string(),
+      repositoryId: v.string(),
+      repositoryFullName: v.string(),
+    }),
+  ),
+  handler: async (ctx, args) => {
+    const [owner, project, connection, credential] = await Promise.all([
+      ctx.db.get(args.ownerId),
+      ctx.db.get(args.projectId),
+      ctx.db
+        .query("serviceConnections")
+        .withIndex("by_owner_id_and_provider", (q) =>
+          q.eq("ownerId", args.ownerId).eq("provider", "github"),
+        )
+        .unique(),
+      ctx.db
+        .query("providerCredentials")
+        .withIndex("by_owner_id_and_provider", (q) =>
+          q.eq("ownerId", args.ownerId).eq("provider", "github"),
+        )
+        .unique(),
+    ]);
+    if (!owner || owner.status !== "active" || !project || project.ownerId !== args.ownerId || project.status !== "active") {
+      throw new ConvexError({ code: "INVALID_CREDENTIAL_SCOPE", message: "Credential scope is invalid" });
+    }
+    if (!connection) return { status: "missing" as const };
+    if (
+      connection.status !== "connected" ||
+      connection.revokedAt !== undefined ||
+      (connection.expiresAt !== undefined && connection.expiresAt <= Date.now()) ||
+      !credential ||
+      connection.credentialRef !== String(credential._id) ||
+      connection.externalAccountIdHash !== credential.externalAccountIdHash ||
+      (credential.expiresAt !== undefined && credential.expiresAt <= Date.now()) ||
+      !credential.externalAccountRefCiphertext
+    ) {
+      return { status: "reauth" as const };
+    }
+    return {
+      status: "ok" as const,
+      externalAccountRefCiphertext: credential.externalAccountRefCiphertext,
+      repositoryId: project.githubRepositoryId,
+      repositoryFullName: project.githubRepositoryFullName,
+    };
+  },
+});
+
 export const revokeConnection = internalMutation({
   args: { ownerId: v.id("users"), provider: providerValidator },
   returns: v.null(),

@@ -10,6 +10,17 @@ export default {
     if (!authorization?.startsWith("Bearer ")) return new Response("Unauthorized", { status: 401 });
     const capability = await verifyCapability(authorization.slice(7), env.GATEWAY_CAPABILITY_SECRET);
     if (!capability) return new Response("Unauthorized", { status: 401 });
-    return Response.json({ userId: capability.sub, projectId: capability.projectId, action: capability.action }, { headers: { "cache-control": "no-store" } });
+    return Response.json({
+      userId: capability.sub,
+      projectId: capability.projectId,
+      sandboxGeneration: capability.sandboxGeneration,
+      action: capability.action,
+      ...(capability.runId ? { runId: capability.runId } : {}),
+      ...(capability.releaseId ? { releaseId: capability.releaseId } : {}),
+      ...(capability.sourceRunId ? { sourceRunId: capability.sourceRunId } : {}),
+      ...(capability.commitSha ? { commitSha: capability.commitSha } : {}),
+      ...(capability.hostname ? { hostname: capability.hostname } : {}),
+      ...(capability.artifactManifestDigest ? { artifactManifestDigest: capability.artifactManifestDigest } : {}),
+    }, { headers: { "cache-control": "no-store" } });
   },
 } satisfies ExportedHandler<Env>;

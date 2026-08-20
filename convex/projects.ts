@@ -13,6 +13,7 @@ const projectValidator = v.object({
   name: v.string(),
   slug: v.string(),
   status: projectStatusValidator,
+  hostingHostname: v.optional(v.string()),
   githubRepositoryFullName: v.string(),
   defaultBranch: v.string(),
   liveReleaseId: v.optional(v.id("releases")),
@@ -74,7 +75,6 @@ export const createProvisioned = internalMutation({
     slug: v.string(),
     githubRepositoryId: v.string(),
     githubRepositoryFullName: v.string(),
-    cloudflareAccountRef: v.string(),
     convexProjectRef: v.string(),
     clerkApplicationRef: v.optional(v.string()),
   },
@@ -102,7 +102,7 @@ export const createProvisioned = internalMutation({
     }
     const readiness = await projectReadiness(ctx, owner._id);
     if (!readiness.ready) throw new ConvexError({ code: "USER_NOT_PROJECT_READY", message: "Required connections are unavailable" });
-    const slug = requireBoundedString(args.slug, "slug", 80);
+    const slug = normalizedProjectSlug(args.slug);
     const existing = await ctx.db
       .query("projects")
       .withIndex("by_owner_id_and_slug", (q) => q.eq("ownerId", owner._id).eq("slug", slug))
@@ -119,12 +119,25 @@ export const createProvisioned = internalMutation({
       githubRepositoryId: args.githubRepositoryId,
       githubRepositoryFullName: args.githubRepositoryFullName,
       defaultBranch: "main",
-      cloudflareAccountRef: args.cloudflareAccountRef,
       convexProjectRef: args.convexProjectRef,
       clerkApplicationRef: args.clerkApplicationRef,
       createdAt: now,
       updatedAt: now,
     });
+    const hostingHostname = managedHostingHostname(slug, projectId);
+    const hostnameOwner = await ctx.db
+      .query("projects")
+      .withIndex("by_hosting_hostname", (q) =>
+        q.eq("hostingHostname", hostingHostname),
+      )
+      .unique();
+    if (hostnameOwner && hostnameOwner._id !== projectId) {
+      throw new ConvexError({
+        code: "HOSTNAME_COLLISION",
+        message: "Managed hosting hostname collision",
+      });
+    }
+    await ctx.db.patch(projectId, { hostingHostname });
     await ctx.db.patch(proposal._id, { status: "confirmed", confirmedProjectId: projectId, updatedAt: now });
     await writeAudit(ctx, {
       ownerId: owner._id, actor: "gateway", action: "project.created",
@@ -151,6 +164,7 @@ export const listMine = query({
       name: project.name,
       slug: project.slug,
       status: project.status,
+      hostingHostname: project.hostingHostname,
       githubRepositoryFullName: project.githubRepositoryFullName,
       defaultBranch: project.defaultBranch,
       liveReleaseId: project.liveReleaseId,
@@ -173,11 +187,96 @@ export const getMine = query({
       name: project.name,
       slug: project.slug,
       status: project.status,
+      hostingHostname: project.hostingHostname,
       githubRepositoryFullName: project.githubRepositoryFullName,
       defaultBranch: project.defaultBranch,
       liveReleaseId: project.liveReleaseId,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
+    };
+  },
+});
+
+function normalizedProjectSlug(value: string): string {
+  const slug = requireBoundedString(value, "slug", 80).toLowerCase();
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/.test(slug)) {
+    throw new ConvexError({
+      code: "INVALID_PROJECT_SLUG",
+      message: "Project slug must be a lowercase DNS label",
+    });
+  }
+  return slug;
+}
+
+function sitesBaseDomain(): string {
+  const domain = (process.env.ICHEF_SITES_BASE_DOMAIN ?? "ichef-sites.buddytools.org")
+    .trim()
+    .toLowerCase()
+    .replace(/\.$/, "");
+  if (
+    domain.length > 180 ||
+    !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$/.test(domain)
+  ) {
+    throw new ConvexError({
+      code: "INVALID_SITES_BASE_DOMAIN",
+      message: "Managed sites base domain is invalid",
+    });
+  }
+  return domain;
+}
+
+function managedHostingHostname(
+  slugValue: string,
+  projectId: string,
+): string {
+  const slug = normalizedProjectSlug(slugValue);
+  const suffix = projectId.toLowerCase();
+  if (!/^[a-z0-9]{16,48}$/.test(suffix)) {
+    throw new ConvexError({
+      code: "INVALID_PROJECT_ID",
+      message: "Project ID cannot be encoded as a hosting hostname",
+    });
+  }
+  const siteLabel = sitesBaseDomain().split(".")[0] ?? "ichef-sites";
+  const prefixLength = 63 - suffix.length - siteLabel.length - 2;
+  const prefix = slug.slice(0, prefixLength).replace(/-+$/, "") || "site";
+  return `${prefix}-${suffix}-${sitesBaseDomain()}`;
+}
+
+export const backfillManagedHostnames = internalMutation({
+  args: { limit: v.optional(v.number()) },
+  returns: v.object({ updated: v.number(), remaining: v.boolean() }),
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50;
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new ConvexError({ code: "INVALID_LIMIT", message: "Invalid backfill limit" });
+    }
+    const rows = await ctx.db
+      .query("projects")
+      .withIndex("by_hosting_hostname", (q) => q.eq("hostingHostname", undefined))
+      .take(limit + 1);
+    for (const project of rows.slice(0, limit)) {
+      const hostingHostname = managedHostingHostname(project.slug, project._id);
+      const existing = await ctx.db
+        .query("projects")
+        .withIndex("by_hosting_hostname", (q) =>
+          q.eq("hostingHostname", hostingHostname),
+        )
+        .unique();
+      if (existing && existing._id !== project._id) {
+        throw new ConvexError({
+          code: "HOSTNAME_COLLISION",
+          message: "Managed hosting hostname collision",
+        });
+      }
+      await ctx.db.patch(project._id, {
+        hostingHostname,
+        updatedAt: Date.now(),
+      });
+    }
+    return {
+      updated: Math.min(rows.length, limit),
+      remaining: rows.length > limit,
     };
   },
 });

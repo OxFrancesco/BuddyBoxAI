@@ -7,11 +7,14 @@ import {
   auditActorValidator,
   auditOutcomeValidator,
   conversationStatusValidator,
+  channelProviderValidator,
+  channelValidator,
   deletionStageValidator,
   deletionStatusValidator,
   deliveryDirectionValidator,
   deliveryStatusValidator,
   iMessageConnectionStatusValidator,
+  encryptedPayloadValidator,
   previewStatusValidator,
   projectStatusValidator,
   proposedProjectStatusValidator,
@@ -25,6 +28,7 @@ import {
   serviceProviderValidator,
   usageKindValidator,
   userStatusValidator,
+  xchatConnectionStatusValidator,
 } from "./modelValidators";
 
 export default defineSchema({
@@ -59,6 +63,48 @@ export default defineSchema({
     .index("by_owner_id_and_created_at", ["ownerId", "createdAt"])
     .index("by_owner_id_and_status", ["ownerId", "status"])
     .index("by_address_hash", ["addressHash"]),
+
+  xchatConnections: defineTable({
+    ownerId: v.id("users"),
+    senderIdHash: v.string(),
+    providerConversationIdHash: v.string(),
+    maskedSender: v.string(),
+    status: xchatConnectionStatusValidator,
+    challengeHash: v.optional(v.string()),
+    challengeExpiresAt: v.optional(v.number()),
+    verifiedAt: v.optional(v.number()),
+    revokedAt: v.optional(v.number()),
+    activeProjectId: v.optional(v.id("projects")),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_owner_id_and_created_at", ["ownerId", "createdAt"])
+    .index("by_owner_id_and_status", ["ownerId", "status"])
+    .index("by_sender_id_hash", ["senderIdHash"]),
+
+  xchatClaims: defineTable({
+    senderIdHash: v.string(),
+    providerConversationIdHash: v.string(),
+    tokenHash: v.string(),
+    ownerId: v.optional(v.id("users")),
+    connectionId: v.optional(v.id("xchatConnections")),
+    status: v.union(
+      v.literal("pending"),
+      v.literal("attached"),
+      v.literal("verified"),
+      v.literal("expired"),
+    ),
+    challengeHash: v.optional(v.string()),
+    expiresAt: v.number(),
+    createdAt: v.number(),
+    updatedAt: v.number(),
+  })
+    .index("by_token_hash", ["tokenHash"])
+    .index("by_owner_id", ["ownerId"])
+    .index("by_connection_id", ["connectionId"])
+    .index("by_sender_id_hash_and_status", ["senderIdHash", "status"])
+    .index("by_expires_at", ["expiresAt"])
+    .index("by_status_and_expires_at", ["status", "expiresAt"]),
 
   imessageClaims: defineTable({
     addressHash: v.string(),
@@ -168,7 +214,7 @@ export default defineSchema({
     githubRepositoryId: v.string(),
     githubRepositoryFullName: v.string(),
     defaultBranch: v.string(),
-    cloudflareAccountRef: v.optional(v.string()),
+    hostingHostname: v.optional(v.string()),
     convexProjectRef: v.optional(v.string()),
     clerkApplicationRef: v.optional(v.string()),
     liveReleaseId: v.optional(v.id("releases")),
@@ -177,12 +223,16 @@ export default defineSchema({
   })
     .index("by_owner_id_and_created_at", ["ownerId", "createdAt"])
     .index("by_owner_id_and_status", ["ownerId", "status"])
-    .index("by_owner_id_and_slug", ["ownerId", "slug"]),
+    .index("by_owner_id_and_slug", ["ownerId", "slug"])
+    .index("by_hosting_hostname", ["hostingHostname"]),
 
   conversations: defineTable({
     ownerId: v.id("users"),
     projectId: v.optional(v.id("projects")),
     imessageConnectionId: v.optional(v.id("imessageConnections")),
+    xchatConnectionId: v.optional(v.id("xchatConnections")),
+    channel: v.optional(channelValidator),
+    providerConversationIdHash: v.optional(v.string()),
     status: conversationStatusValidator,
     title: v.optional(v.string()),
     createdAt: v.number(),
@@ -196,6 +246,10 @@ export default defineSchema({
     ])
     .index("by_imessage_connection_id_and_updated_at", [
       "imessageConnectionId",
+      "updatedAt",
+    ])
+    .index("by_xchat_connection_id_and_updated_at", [
+      "xchatConnectionId",
       "updatedAt",
     ]),
 
@@ -305,6 +359,13 @@ export default defineSchema({
     version: v.number(),
     status: releaseStatusValidator,
     commitSha: v.string(),
+    deploymentHostname: v.optional(v.string()),
+    artifactManifestDigest: v.optional(v.string()),
+    uploadAttemptId: v.optional(v.string()),
+    uploadReservedAt: v.optional(v.number()),
+    uploadReservationStatus: v.optional(
+      v.union(v.literal("reserved"), v.literal("failed"), v.literal("completed")),
+    ),
     deploymentRef: v.optional(v.string()),
     liveUrl: v.optional(v.string()),
     previousReleaseId: v.optional(v.id("releases")),
@@ -321,13 +382,24 @@ export default defineSchema({
   channelDeliveries: defineTable({
     ownerId: v.optional(v.id("users")),
     imessageConnectionId: v.optional(v.id("imessageConnections")),
+    xchatConnectionId: v.optional(v.id("xchatConnections")),
     conversationId: v.optional(v.id("conversations")),
     runId: v.optional(v.id("runs")),
-    provider: v.literal("spectrum"),
+    provider: channelProviderValidator,
+    providerSenderIdHash: v.optional(v.string()),
+    providerConversationIdHash: v.optional(v.string()),
     direction: deliveryDirectionValidator,
+    providerEventId: v.optional(v.string()),
     providerMessageId: v.string(),
     commandKey: v.optional(v.string()),
     messageHash: v.string(),
+    encryptedPayload: v.optional(encryptedPayloadValidator),
+    payloadAad: v.optional(v.string()),
+    availableAt: v.optional(v.number()),
+    leaseIdHash: v.optional(v.string()),
+    leaseExpiresAt: v.optional(v.number()),
+    attemptCount: v.optional(v.number()),
+    externalMessageIdHash: v.optional(v.string()),
     status: deliveryStatusValidator,
     errorCode: v.optional(v.string()),
     occurredAt: v.number(),
@@ -338,8 +410,24 @@ export default defineSchema({
       "provider",
       "providerMessageId",
     ])
+    .index("by_provider_and_provider_event_id", [
+      "provider",
+      "providerEventId",
+    ])
     .index("by_owner_id_and_command_key", ["ownerId", "commandKey"])
     .index("by_owner_id_and_occurred_at", ["ownerId", "occurredAt"])
+    .index("by_provider_and_direction_and_status_and_available_at", [
+      "provider",
+      "direction",
+      "status",
+      "availableAt",
+    ])
+    .index("by_provider_and_direction_and_status_and_lease_expires_at", [
+      "provider",
+      "direction",
+      "status",
+      "leaseExpiresAt",
+    ])
     .index("by_status_and_updated_at", ["status", "updatedAt"])
     .index("by_expires_at", ["expiresAt"]),
 
@@ -362,10 +450,13 @@ export default defineSchema({
     status: v.union(
       v.literal("pending"),
       v.literal("in_flight"),
+      v.literal("reconciliation_required"),
       v.literal("delivered"),
       v.literal("failed_retryable"),
     ),
     attempts: v.number(),
+    leaseIdHash: v.optional(v.string()),
+    leaseExpiresAt: v.optional(v.number()),
     providerMessageId: v.optional(v.string()),
     lastErrorCode: v.optional(v.string()),
     createdAt: v.number(),

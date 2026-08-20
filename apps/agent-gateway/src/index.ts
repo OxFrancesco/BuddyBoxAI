@@ -55,13 +55,20 @@ Sandbox.outboundByHost = {
 
 Sandbox.outbound = async () => new Response("Outbound destination is not permitted.", { status: 403 });
 
-type GatewayAction = "admission" | "run" | "cancel" | "heartbeat" | "checkpoint" | "replacement" | "preview" | "artifact";
+type GatewayAction = "admission" | "run" | "cancel" | "heartbeat" | "checkpoint" | "replacement" | "preview" | "artifact_read" | "screenshot" | "deploy";
 
 async function authenticate(request: Request, env: Env): Promise<{
   userId: string;
   projectId: string;
+  sandboxGeneration: number;
   action: GatewayAction;
   capability: string;
+  runId?: string;
+  releaseId?: string;
+  sourceRunId?: string;
+  commitSha?: string;
+  hostname?: string;
+  artifactManifestDigest?: string;
 } | null> {
   const authorization = request.headers.get("authorization");
   if (!authorization || authorization.length > LIMITS.capabilityCharacters + 16) return null;
@@ -77,10 +84,26 @@ async function authenticate(request: Request, env: Env): Promise<{
     typeof body !== "object" || body === null ||
     !("userId" in body) || typeof body.userId !== "string" ||
     !("projectId" in body) || typeof body.projectId !== "string" ||
+    !("sandboxGeneration" in body) || !Number.isSafeInteger(body.sandboxGeneration) ||
     !("action" in body) || typeof body.action !== "string" ||
-    !["admission", "run", "cancel", "heartbeat", "checkpoint", "replacement", "preview", "artifact"].includes(body.action)
+    !["admission", "run", "cancel", "heartbeat", "checkpoint", "replacement", "preview", "artifact_read", "screenshot", "deploy"].includes(body.action)
   ) return null;
-  return { userId: body.userId, projectId: body.projectId, action: body.action as GatewayAction, capability: authorization.slice(7) };
+  const authority = {
+    userId: body.userId,
+    projectId: body.projectId,
+    sandboxGeneration: Number(body.sandboxGeneration),
+    action: body.action as GatewayAction,
+    capability: authorization.slice(7),
+    ...("runId" in body && typeof body.runId === "string" ? { runId: body.runId } : {}),
+    ...("releaseId" in body && typeof body.releaseId === "string" ? { releaseId: body.releaseId } : {}),
+    ...("sourceRunId" in body && typeof body.sourceRunId === "string" ? { sourceRunId: body.sourceRunId } : {}),
+    ...("commitSha" in body && typeof body.commitSha === "string" ? { commitSha: body.commitSha } : {}),
+    ...("hostname" in body && typeof body.hostname === "string" ? { hostname: body.hostname } : {}),
+    ...("artifactManifestDigest" in body && typeof body.artifactManifestDigest === "string" ? { artifactManifestDigest: body.artifactManifestDigest } : {}),
+  };
+  if ((authority.action === "run" || authority.action === "cancel") && !authority.runId) return null;
+  if (authority.action === "deploy" && (!authority.releaseId || !authority.sourceRunId || !authority.commitSha || !authority.hostname || !authority.artifactManifestDigest)) return null;
+  return authority;
 }
 
 export default {
@@ -100,6 +123,30 @@ export default {
           if (object.size > LIMITS.checkpointBytes) return null;
           return new Uint8Array(await object.arrayBuffer());
         },
+      },
+      async publishSite(payload) {
+        const response = await env.SITE_HOST.fetch(new Request("https://site-host.internal/v1/deployments", {
+          method: "POST",
+          headers: {
+            authorization: `Bearer ${payload.capability}`,
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(payload, (key, value) => key === "capability" ? undefined : value),
+        }));
+        const result = await response.json<unknown>().catch(() => null);
+        if (!response.ok || !result || typeof result !== "object" ||
+          !("projectId" in result) || typeof result.projectId !== "string" ||
+          !("releaseId" in result) || typeof result.releaseId !== "string" ||
+          !("deploymentRef" in result) || typeof result.deploymentRef !== "string" ||
+          !("liveUrl" in result) || typeof result.liveUrl !== "string") {
+          throw new Error("Managed site deployment failed");
+        }
+        return {
+          projectId: result.projectId,
+          releaseId: result.releaseId,
+          deploymentRef: result.deploymentRef,
+          liveUrl: result.liveUrl,
+        };
       },
     });
     return handler.fetch(request);

@@ -16,6 +16,15 @@ _Avoid_: Sender allowlist, phone mapping, login session
 A User-authorized relationship that lets iChef use one external service on that User's behalf. It records delegated authority and health without making stored credentials part of the User-facing concept.
 _Avoid_: Provider Connection, integration, API key, credential
 
+Cloudflare hosting is not a Service Connection during the managed beta. It is
+an iChef platform capability; Users never authorize or supply a Cloudflare account.
+
+**Managed Site Address**:
+The iChef-hosted address assigned to a Project release. The reserved convention
+is `<project>-ichef-sites.buddytools.org`; collisions receive a stable suffix.
+It is not a claim of User ownership or custom-domain support.
+_Avoid_: User Cloudflare, connected host, custom domain
+
 **Project-ready User**:
 A User whose iMessage Connection and required Service Connections, including source ownership, are verified. Only a Project-ready User may confirm a Proposed Project or begin its initial Run.
 _Avoid_: Logged-in user, onboarded sender, connected account

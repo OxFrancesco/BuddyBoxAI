@@ -13,6 +13,24 @@ export const iMessageConnectionStatusValidator = v.union(
   v.literal("revoked"),
 );
 
+export const xchatConnectionStatusValidator = v.union(
+  v.literal("pending"),
+  v.literal("challenge_sent"),
+  v.literal("verified"),
+  v.literal("revoked"),
+);
+
+export const channelValidator = v.union(
+  v.literal("imessage"),
+  v.literal("xchat"),
+  v.literal("web"),
+);
+
+export const channelProviderValidator = v.union(
+  v.literal("spectrum"),
+  v.literal("xchat"),
+);
+
 export const serviceProviderValidator = v.union(
   v.literal("chatgpt"),
   v.literal("github"),
@@ -137,10 +155,19 @@ export const deliveryStatusValidator = v.union(
   v.literal("received"),
   v.literal("accepted"),
   v.literal("duplicate"),
+  v.literal("queued"),
+  v.literal("leased"),
   v.literal("sent"),
   v.literal("delivered"),
   v.literal("failed"),
 );
+
+export const encryptedPayloadValidator = v.object({
+  algorithm: v.literal("AES-256-GCM"),
+  keyVersion: v.number(),
+  iv: v.string(),
+  ciphertext: v.string(),
+});
 
 export const usageKindValidator = v.union(
   v.literal("runs"),
@@ -172,6 +199,7 @@ export const auditActorValidator = v.union(
   v.literal("user"),
   v.literal("system"),
   v.literal("imessage"),
+  v.literal("xchat"),
   v.literal("gateway"),
 );
 

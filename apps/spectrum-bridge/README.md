@@ -20,7 +20,9 @@ return-message challenge below.
   durable Convex admission before returning `202`.
 - `POST /v1/outbound` — trusted Convex-to-bridge delivery. Requires
   `Authorization: Bearer $ICHEF_BRIDGE_SECRET`; the JSON body is limited to 32
-  KiB and the text to 6,000 characters.
+  KiB and the text to 6,000 characters. A delivery whose provider acceptance is
+  ambiguous returns `409` with `{"status":"reconciliation_required"}` and no
+  retry instruction.
 
 Webhook mode is the production default because Spectrum can retry a non-2xx
 response. `grpc` is available for environments that cannot register a webhook;
@@ -70,16 +72,25 @@ control-plane behavior:
   the Conversation/Run or returns an onboarding reply.
 - `complete_challenge` consumes an expiring challenge atomically. Hash and
   compare the received code server-side; never store it in plaintext.
-- `claim_outbound` leases an outbound delivery by its idempotency key. Return
-  `claimed`, `in_flight`, or `already_delivered`.
-- `settle_outbound` makes `delivered` terminal. `failed_retryable` remains
-  eligible for a later Convex-scheduled call to `/v1/outbound`.
+- `claim_outbound` leases an outbound delivery by its idempotency key. A
+  successful claim returns a fresh 256-bit opaque lease token; Convex stores
+  only its SHA-256 hash and a bounded expiry. An unexpired lease returns
+  `in_flight`. An expired `in_flight` lease becomes
+  `reconciliation_required`; it is never automatically reclaimed.
+- `settle_outbound` requires the token for the current lease. A stale worker
+  cannot settle after an operator requeues the delivery. A late settlement with
+  the exact retained lease can resolve `reconciliation_required`. `delivered`
+  is terminal and idempotent for the matching lease; a definitely failed send
+  that successfully settles `failed_retryable` remains eligible for a later
+  Convex-scheduled call to `/v1/outbound`.
 
 If Spectrum accepts a send but Convex settlement is temporarily unavailable,
 the bridge returns `settlement_pending` and does not send the provider message
-again. Keep the outbound lease in-flight and reconcile that ambiguous record;
-expiring the lease into an automatic resend can duplicate a message because
-Spectrum does not expose a send idempotency key.
+again. When its lease expires, Convex durably blocks the delivery in
+`reconciliation_required`. An operator-only internal reconciliation mutation
+must then either mark verified provider acceptance delivered or deliberately
+requeue it. Automatically resending after lease expiry can duplicate a message
+because Spectrum does not expose a send idempotency key.
 
 The broker is intentionally a small typed seam. It prevents the bridge from
 learning Convex table layout or receiving a Clerk session, while Convex retains

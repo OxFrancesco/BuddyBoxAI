@@ -111,6 +111,8 @@ describe("Spectrum trust broker", () => {
     const firstClaim = await t.mutation(internal.bridge.claimOutbound, {
       outboundId: "unused-outbound",
       idempotencyKey: "unused-key",
+      leaseIdHash: "0".repeat(64),
+      leaseExpiresAt: now + 60_000,
     }).catch(() => null);
     expect(firstClaim).toBeNull();
 
@@ -125,19 +127,215 @@ describe("Spectrum trust broker", () => {
       expiresAt: now + 60_000,
     }));
     expect(await t.mutation(internal.bridge.claimOutbound, {
-      outboundId: "outbound-2", idempotencyKey: "outbound-key-2",
+      outboundId: "outbound-2",
+      idempotencyKey: "outbound-key-2",
+      leaseIdHash: "a".repeat(64),
+      leaseExpiresAt: now + 60_000,
     })).toEqual({ status: "claimed" });
     expect(await t.mutation(internal.bridge.claimOutbound, {
-      outboundId: "outbound-2", idempotencyKey: "outbound-key-2",
+      outboundId: "outbound-2",
+      idempotencyKey: "outbound-key-2",
+      leaseIdHash: "b".repeat(64),
+      leaseExpiresAt: now + 60_000,
     })).toEqual({ status: "in_flight" });
     await t.mutation(internal.bridge.settleOutbound, {
       outboundId: "outbound-2",
+      leaseIdHash: "a".repeat(64),
       status: "delivered",
       attempts: 1,
       providerMessageId: "spectrum-sent-2",
     });
     expect(await t.mutation(internal.bridge.claimOutbound, {
-      outboundId: "outbound-2", idempotencyKey: "outbound-key-2",
+      outboundId: "outbound-2",
+      idempotencyKey: "outbound-key-2",
+      leaseIdHash: "c".repeat(64),
+      leaseExpiresAt: now + 60_000,
     })).toEqual({ status: "already_delivered" });
+  });
+
+  test("an expired outbound lease requires reconciliation and is never automatically reclaimed", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const outboundId = "outbound-reclaim-1";
+    await t.run(async (ctx) => ctx.db.insert("outboundDeliveries", {
+      outboundId,
+      idempotencyKey: "outbound-reclaim-key-1",
+      payloadCiphertext: "v1.payload",
+      status: "in_flight",
+      attempts: 0,
+      leaseIdHash: "d".repeat(64),
+      leaseExpiresAt: now - 1,
+      createdAt: now - 60_000,
+      updatedAt: now - 60_000,
+      expiresAt: now + 60_000,
+    }));
+
+    expect(await t.mutation(internal.bridge.claimOutbound, {
+      outboundId,
+      idempotencyKey: "outbound-reclaim-key-1",
+      leaseIdHash: "e".repeat(64),
+      leaseExpiresAt: now + 60_000,
+    })).toEqual({ status: "reconciliation_required" });
+    const ambiguous = await t.run(async (ctx) => ctx.db.query("outboundDeliveries")
+      .withIndex("by_outbound_id", (q) => q.eq("outboundId", outboundId))
+      .unique());
+    expect(ambiguous?.status).toBe("reconciliation_required");
+    expect(ambiguous?.leaseIdHash).toBe("d".repeat(64));
+
+    await t.mutation(internal.bridge.settleOutbound, {
+      outboundId,
+      leaseIdHash: "d".repeat(64),
+      status: "delivered",
+      attempts: 1,
+      providerMessageId: "stale-provider-message",
+    });
+    expect(await t.mutation(internal.bridge.claimOutbound, {
+      outboundId,
+      idempotencyKey: "outbound-reclaim-key-1",
+      leaseIdHash: "f".repeat(64),
+      leaseExpiresAt: now + 60_000,
+    })).toEqual({ status: "already_delivered" });
+  });
+
+  test("a definitely failed settlement remains claimable with a fresh exact lease", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const outboundId = "outbound-definitely-failed-1";
+    await t.run(async (ctx) => ctx.db.insert("outboundDeliveries", {
+      outboundId,
+      idempotencyKey: "outbound-definitely-failed-key-1",
+      payloadCiphertext: "v1.payload",
+      status: "pending",
+      attempts: 0,
+      createdAt: now,
+      updatedAt: now,
+      expiresAt: now + 60_000,
+    }));
+
+    expect(await t.mutation(internal.bridge.claimOutbound, {
+      outboundId,
+      idempotencyKey: "outbound-definitely-failed-key-1",
+      leaseIdHash: "1".repeat(64),
+      leaseExpiresAt: now + 60_000,
+    })).toEqual({ status: "claimed" });
+    await t.mutation(internal.bridge.settleOutbound, {
+      outboundId,
+      leaseIdHash: "1".repeat(64),
+      status: "failed_retryable",
+      attempts: 3,
+      errorCode: "spectrum_unavailable",
+    });
+
+    expect(await t.mutation(internal.bridge.claimOutbound, {
+      outboundId,
+      idempotencyKey: "outbound-definitely-failed-key-1",
+      leaseIdHash: "2".repeat(64),
+      leaseExpiresAt: now + 60_000,
+    })).toEqual({ status: "claimed" });
+  });
+
+  test("an operator can deliberately requeue an ambiguous outbound delivery", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const outboundId = "outbound-reconcile-requeue-1";
+    await t.run(async (ctx) => ctx.db.insert("outboundDeliveries", {
+      outboundId,
+      idempotencyKey: "outbound-reconcile-requeue-key-1",
+      payloadCiphertext: "v1.payload",
+      status: "in_flight",
+      attempts: 1,
+      leaseIdHash: "3".repeat(64),
+      leaseExpiresAt: now - 1,
+      createdAt: now - 60_000,
+      updatedAt: now - 60_000,
+      expiresAt: now + 60_000,
+    }));
+    expect(await t.mutation(internal.bridge.claimOutbound, {
+      outboundId,
+      idempotencyKey: "outbound-reconcile-requeue-key-1",
+      leaseIdHash: "4".repeat(64),
+      leaseExpiresAt: now + 60_000,
+    })).toEqual({ status: "reconciliation_required" });
+
+    expect(await t.mutation(internal.bridge.reconcileOutbound, {
+      outboundId,
+      disposition: "requeue",
+    })).toEqual({ status: "requeued" });
+    await expect(t.mutation(internal.bridge.settleOutbound, {
+      outboundId,
+      leaseIdHash: "3".repeat(64),
+      status: "delivered",
+      attempts: 1,
+      providerMessageId: "late-stale-settlement",
+    })).rejects.toThrow("lease");
+    expect(await t.mutation(internal.bridge.claimOutbound, {
+      outboundId,
+      idempotencyKey: "outbound-reconcile-requeue-key-1",
+      leaseIdHash: "4".repeat(64),
+      leaseExpiresAt: now + 60_000,
+    })).toEqual({ status: "claimed" });
+  });
+
+  test("an operator can mark verified provider acceptance delivered idempotently", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    const outboundId = "outbound-reconcile-delivered-1";
+    await t.run(async (ctx) => ctx.db.insert("outboundDeliveries", {
+      outboundId,
+      idempotencyKey: "outbound-reconcile-delivered-key-1",
+      payloadCiphertext: "v1.payload",
+      status: "in_flight",
+      attempts: 1,
+      leaseIdHash: "5".repeat(64),
+      leaseExpiresAt: now - 1,
+      createdAt: now - 60_000,
+      updatedAt: now - 60_000,
+      expiresAt: now + 60_000,
+    }));
+    expect(await t.mutation(internal.bridge.claimOutbound, {
+      outboundId,
+      idempotencyKey: "outbound-reconcile-delivered-key-1",
+      leaseIdHash: "6".repeat(64),
+      leaseExpiresAt: now + 60_000,
+    })).toEqual({ status: "reconciliation_required" });
+
+    expect(await t.mutation(internal.bridge.reconcileOutbound, {
+      outboundId,
+      disposition: "mark_delivered",
+      providerMessageId: "spectrum-confirmed-delivery-1",
+    })).toEqual({ status: "delivered" });
+    expect(await t.mutation(internal.bridge.reconcileOutbound, {
+      outboundId,
+      disposition: "mark_delivered",
+      providerMessageId: "spectrum-confirmed-delivery-1",
+    })).toEqual({ status: "already_delivered" });
+    expect(await t.mutation(internal.bridge.claimOutbound, {
+      outboundId,
+      idempotencyKey: "outbound-reconcile-delivered-key-1",
+      leaseIdHash: "6".repeat(64),
+      leaseExpiresAt: now + 60_000,
+    })).toEqual({ status: "already_delivered" });
+  });
+
+  test("rejects an outbound lease with an unbounded expiry", async () => {
+    const t = convexTest(schema, modules);
+    const now = Date.now();
+    await t.run(async (ctx) => ctx.db.insert("outboundDeliveries", {
+      outboundId: "outbound-unbounded-1",
+      idempotencyKey: "outbound-unbounded-key-1",
+      payloadCiphertext: "v1.payload",
+      status: "pending",
+      attempts: 0,
+      createdAt: now,
+      updatedAt: now,
+      expiresAt: now + 60_000,
+    }));
+
+    await expect(t.mutation(internal.bridge.claimOutbound, {
+      outboundId: "outbound-unbounded-1",
+      idempotencyKey: "outbound-unbounded-key-1",
+      leaseIdHash: "1".repeat(64),
+      leaseExpiresAt: now + 5 * 60_000 + 10_000,
+    })).rejects.toThrow("expiry");
   });
 });

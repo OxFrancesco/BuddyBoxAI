@@ -201,10 +201,20 @@ async function deleteStageBatch(
     if (step === "claims") {
       const rows = await ctx.db.query("imessageClaims").withIndex("by_owner_id", (q) => q.eq("ownerId", ownerId)).take(BATCH_SIZE);
       if (rows.length) return { deleted: await deleteRows(ctx, rows), nextCursor: step };
+      return { deleted: 0, nextCursor: "xchat_claims" };
+    }
+    if (step === "xchat_claims") {
+      const rows = await ctx.db.query("xchatClaims").withIndex("by_owner_id", (q) => q.eq("ownerId", ownerId)).take(BATCH_SIZE);
+      if (rows.length) return { deleted: await deleteRows(ctx, rows), nextCursor: step };
       return { deleted: 0, nextCursor: "services" };
     }
     if (step === "services") {
       const rows = await ctx.db.query("serviceConnections").withIndex("by_owner_id_and_status", (q) => q.eq("ownerId", ownerId)).take(BATCH_SIZE);
+      if (rows.length) return { deleted: await deleteRows(ctx, rows), nextCursor: step };
+      return { deleted: 0, nextCursor: "xchat" };
+    }
+    if (step === "xchat") {
+      const rows = await ctx.db.query("xchatConnections").withIndex("by_owner_id_and_created_at", (q) => q.eq("ownerId", ownerId)).take(BATCH_SIZE);
       if (rows.length) return { deleted: await deleteRows(ctx, rows), nextCursor: step };
       return { deleted: 0, nextCursor: "imessage" };
     }

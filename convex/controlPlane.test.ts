@@ -47,12 +47,31 @@ async function readyUserFixture(t: ReturnType<typeof convexTest>, subject: strin
       updatedAt: now,
     }),
   );
-  for (const provider of ["chatgpt", "github", "cloudflare", "convex"] as const) {
+  for (const provider of ["chatgpt", "github", "convex"] as const) {
+    const externalAccountIdHash = `${provider}-account-${subject}`;
+    const credentialId = provider === "chatgpt" ? undefined : await t.run((ctx) =>
+      ctx.db.insert("providerCredentials", {
+        ownerId: user._id,
+        provider,
+        accessTokenCiphertext: `encrypted-${provider}-${subject}`,
+        tokenType: "bearer",
+        scopes: [],
+        externalAccountIdHash,
+        expiresAt: now + 60_000,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
     await t.mutation(internal.connections.setServiceConnection, {
       ownerId: user._id,
       provider,
       status: "connected",
       scopes: [],
+      ...(credentialId ? {
+        externalAccountIdHash,
+        credentialRef: String(credentialId),
+        expiresAt: now + 60_000,
+      } : {}),
     });
   }
   const projectId = await t.run(async (ctx) =>
@@ -64,7 +83,6 @@ async function readyUserFixture(t: ReturnType<typeof convexTest>, subject: strin
       githubRepositoryId: `repo-${subject}`,
       githubRepositoryFullName: `${subject}/project`,
       defaultBranch: "main",
-      cloudflareAccountRef: `cf-${subject}`,
       convexProjectRef: `convex-${subject}`,
       createdAt: now,
       updatedAt: now,
@@ -74,6 +92,194 @@ async function readyUserFixture(t: ReturnType<typeof convexTest>, subject: strin
 }
 
 describe("authenticated Convex control plane", () => {
+  test("managed hosting assigns collision-safe hostnames and atomically activates a release", async () => {
+    const t = convexTest(schema, modules);
+    const alice = await readyUserFixture(t, "hosting-alice");
+    const bob = await readyUserFixture(t, "hosting-bob");
+    const backfilled = await t.mutation(internal.projects.backfillManagedHostnames, {
+      limit: 10,
+    });
+    expect(backfilled.updated).toBeGreaterThanOrEqual(2);
+    const [aliceProject, bobProject] = await t.run((ctx) =>
+      Promise.all([ctx.db.get(alice.projectId), ctx.db.get(bob.projectId)]),
+    );
+    expect(aliceProject?.hostingHostname).toEndWith("-ichef-sites.buddytools.org");
+    expect(bobProject?.hostingHostname).toEndWith("-ichef-sites.buddytools.org");
+    expect(aliceProject?.hostingHostname).not.toBe(bobProject?.hostingHostname);
+
+    const now = Date.now();
+    const commitSha = "a".repeat(40);
+    const artifactManifestDigest = "b".repeat(64);
+    const hostname = aliceProject?.hostingHostname ?? "";
+    const sourceRunId = await t.run((ctx) =>
+      ctx.db.insert("runs", {
+        ownerId: alice.user._id,
+        projectId: alice.projectId,
+        commandKey: "managed-hosting-release",
+        instructionHash: "managed-hosting-instruction",
+        status: "succeeded",
+        outcome: "succeeded",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const approvalId = await t.run((ctx) =>
+      ctx.db.insert("approvals", {
+        ownerId: alice.user._id,
+        projectId: alice.projectId,
+        runId: sourceRunId,
+        operation: "publish_release",
+        bindingHash: "managed-hosting-binding",
+        status: "consumed",
+        expiresAt: now + 60_000,
+        consumedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const releaseId = await t.mutation(internal.releases.create, {
+      ownerId: alice.user._id,
+      projectId: alice.projectId,
+      sourceRunId,
+      approvalId,
+      bindingHash: "managed-hosting-binding",
+      commitSha,
+      deploymentHostname: hostname,
+      artifactManifestDigest,
+    });
+    expect(await t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_one",
+    })).toEqual({ status: "reserved" });
+    await expect(t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: bob.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_cross_project",
+    })).rejects.toThrow("does not match");
+    await expect(t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest: "c".repeat(64),
+      attemptId: "attempt_other_manifest",
+    })).rejects.toThrow("does not match");
+    const siblingRunId = await t.run((ctx) =>
+      ctx.db.insert("runs", {
+        ownerId: alice.user._id,
+        projectId: alice.projectId,
+        commandKey: "managed-hosting-sibling",
+        instructionHash: "managed-hosting-sibling-instruction",
+        status: "succeeded",
+        outcome: "succeeded",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await expect(t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId: siblingRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_sibling_run",
+    })).rejects.toThrow("does not match");
+    await expect(t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_concurrent",
+    })).rejects.toThrow("already in progress");
+    expect(await t.mutation(internal.releases.failManagedDeploymentUpload, {
+      releaseId,
+      attemptId: "attempt_one",
+    })).toEqual({ status: "failed" });
+    expect(await t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_retry",
+    })).toEqual({ status: "reserved" });
+    const liveUrl = `https://${hostname}/`;
+    const activated = await t.mutation(internal.releases.activateManagedRelease, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_retry",
+      deploymentRef: "r2/releases/immutable-release-1",
+      liveUrl,
+    });
+    expect(activated).toEqual({
+      projectId: alice.projectId,
+      releaseId,
+      status: "live",
+    });
+    expect(await t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_after_live",
+    })).toEqual({
+      status: "live",
+      deploymentRef: "r2/releases/immutable-release-1",
+      liveUrl,
+    });
+    expect(await t.mutation(internal.releases.activateManagedRelease, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_retry",
+      deploymentRef: "r2/releases/immutable-release-1",
+      liveUrl,
+    })).toEqual(activated);
+    expect(await t.query(internal.releases.resolveManagedSite, {
+      hostname: aliceProject?.hostingHostname ?? "",
+    })).toEqual({
+      projectId: alice.projectId,
+      releaseId,
+      commitSha,
+      deploymentRef: "r2/releases/immutable-release-1",
+      status: "live",
+    });
+    await expect(t.mutation(internal.releases.activateManagedRelease, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_retry",
+      deploymentRef: "r2/releases/different",
+      liveUrl,
+    })).rejects.toThrow("different deployment data");
+  });
+
   test("owner isolation and one-active-Run admission hold across Users", async () => {
     const t = convexTest(schema, modules);
     const alice = await readyUserFixture(t, "alice");
@@ -261,9 +467,35 @@ describe("authenticated Convex control plane", () => {
         spectrum: "revoked",
       }),
     });
+    const now = Date.now();
+    const xchatConnectionId = await t.run((ctx) =>
+      ctx.db.insert("xchatConnections", {
+        ownerId: alice.user._id,
+        senderIdHash: "deletion-xchat-sender",
+        providerConversationIdHash: "deletion-xchat-conversation",
+        maskedSender: "X Chat •sender",
+        status: "verified",
+        verifiedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await t.run((ctx) =>
+      ctx.db.insert("xchatClaims", {
+        senderIdHash: "deletion-xchat-sender",
+        providerConversationIdHash: "deletion-xchat-conversation",
+        tokenHash: "deletion-xchat-token",
+        ownerId: alice.user._id,
+        connectionId: xchatConnectionId,
+        status: "verified",
+        expiresAt: now + 60_000,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
 
     let result: { status: string; stage: string } = { status: "purging", stage: "approvals" };
-    for (let pass = 0; pass < 30 && result.status !== "complete"; pass += 1) {
+    for (let pass = 0; pass < 40 && result.status !== "complete"; pass += 1) {
       result = await t.mutation(internal.deletions.advance, { jobId });
     }
     expect(result).toMatchObject({ status: "complete", stage: "done" });
@@ -279,5 +511,15 @@ describe("authenticated Convex control plane", () => {
     expect(tombstone).toMatchObject({ status: "deleted" });
     expect(tombstone?.primaryEmail).toBeUndefined();
     expect(tombstone?.displayName).toBeUndefined();
+    expect(await t.run((ctx) =>
+      ctx.db.query("xchatConnections")
+        .withIndex("by_owner_id_and_created_at", (q) => q.eq("ownerId", alice.user._id))
+        .take(1),
+    )).toEqual([]);
+    expect(await t.run((ctx) =>
+      ctx.db.query("xchatClaims")
+        .withIndex("by_owner_id", (q) => q.eq("ownerId", alice.user._id))
+        .take(1),
+    )).toEqual([]);
   });
 });

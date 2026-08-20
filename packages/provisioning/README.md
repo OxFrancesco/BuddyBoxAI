@@ -13,3 +13,9 @@ write`, and `Metadata: read`. For the MVP, installation must cover all
 repositories so a newly created personal repository is immediately available to
 the App. Tokens are request-local, are never returned to the Sandbox, and must
 never be logged or persisted as Git remotes.
+
+Runtime Git traffic is narrower than provisioning. The credential broker mints
+a one-hour installation token scoped to exactly the Project's repository ID and
+only `Contents: write` plus `Metadata: read`. `github-egress` maps Git smart HTTP
+and a small allowlist of repository content/Git-database APIs; it rejects
+cross-repository, administrative, encoded-path, and redirecting requests.

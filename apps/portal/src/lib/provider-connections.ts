@@ -15,22 +15,6 @@ export const providerConnectionRequirements = {
     gateNotice:
       "Project creation stays locked until GitHub returns a verified App installation for your Clerk account.",
   },
-  cloudflare: {
-    id: "cloudflare",
-    eyebrow: "Connect Cloudflare",
-    headline: "Deploy into infrastructure you control.",
-    summary:
-      "Cloudflare authorization will let iChef provision project-scoped Workers, preview routes, and storage in your account without asking you to paste a long-lived API token into the browser.",
-    operatorPrerequisites: [
-      "Register an iChef Cloudflare OAuth integration and its production callback URL.",
-      "Perform the authorization-code exchange only in the server-side credential broker.",
-      "Request project deployment permissions with the narrowest supported account and resource scope.",
-    ],
-    userApproval:
-      "You will choose the Cloudflare account iChef may deploy to and review the requested resource permissions.",
-    gateNotice:
-      "No Cloudflare connection is recorded until the callback succeeds and iChef verifies the selected account.",
-  },
   convex: {
     id: "convex",
     eyebrow: "Connect Convex",

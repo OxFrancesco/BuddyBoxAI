@@ -1,9 +1,11 @@
 import { getSandbox, type Sandbox as SandboxClient } from "@cloudflare/sandbox";
+import { withLifecycleAuthorization } from "./lifecycle-auth";
 
 export { Sandbox } from "@cloudflare/sandbox";
 
 interface Env {
   Sandbox: DurableObjectNamespace<SandboxClient>;
+  ICHEF_PROTOTYPE_SECRET?: string;
 }
 
 const runnerPort = 8790;
@@ -201,7 +203,7 @@ async function checkpointAndReplace(env: Env, id: string) {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  fetch: withLifecycleAuthorization<Env>(async (request: Request, env: Env): Promise<Response> => {
     const url = new URL(request.url);
     const match = url.pathname.match(/^\/api\/sandboxes\/([^/]+)\/(setup|runs|preview|state|recover|destroy)(.*)$/);
     if (!match) return new Response("PROTOTYPE: use /api/sandboxes/:id/*", { status: 404 });
@@ -238,5 +240,5 @@ export default {
     } catch (error) {
       return jsonError(error);
     }
-  },
+  }),
 };

@@ -13,9 +13,9 @@ function SignUpPage() {
         <span>iChef</span>
       </a>
       <div className="auth-card">
-        <p className="eyebrow">Invitation-only mise en place</p>
+        <p className="eyebrow">Google sign-up · secured by Clerk</p>
         <h1>Open your iChef kitchen.</h1>
-        <p>Start with identity, then bind iMessage, ChatGPT, and GitHub before the first project.</p>
+        <p>Start with Google, then verify iMessage or X Chat and separately connect ChatGPT, GitHub, and Convex.</p>
         <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" />
       </div>
     </main>

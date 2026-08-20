@@ -9,10 +9,11 @@ authentication, or provider calls.
 
 `@ichef/contracts/domain` exports the canonical domain schemas and inferred
 types from `CONTEXT.md`. `evaluateProjectReadiness` is the single eligibility
-rule for starting a Project: the same User must own a verified iMessage
-Connection and healthy ChatGPT, GitHub, Cloudflare, and Convex Service
-Connections. OpenRouter is supported as an optional fallback and does not make
-a User Project-ready by itself.
+rule for starting a Project: the same User must own a verified messaging
+connection (iMessage or X Chat) and healthy ChatGPT, GitHub, and Convex Service
+Connections. Cloudflare is operated centrally by iChef rather than connected by
+each User. OpenRouter remains an optional fallback and does not make a User
+Project-ready by itself.
 
 `@ichef/contracts/runtime` exports version 1 of the trusted Agent Gateway ↔ Pi
 Sandbox protocol:

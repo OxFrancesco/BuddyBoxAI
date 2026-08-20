@@ -95,6 +95,9 @@ async function handleOutbound(request: Request, options: RequestHandlerOptions):
     if (result.status === "failed_retryable" || result.status === "settlement_pending") {
       return Response.json(result, { status: 503, headers: { "retry-after": "30" } });
     }
+    if (result.status === "reconciliation_required") {
+      return Response.json(result, { status: 409 });
+    }
     return Response.json(result, { status: result.status === "in_flight" ? 202 : 200 });
   } catch {
     return new Response(null, { status: 503, headers: { "retry-after": "30" } });

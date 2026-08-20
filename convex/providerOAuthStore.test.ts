@@ -73,4 +73,50 @@ describe("provider OAuth storage", () => {
     expect((await t.run(async (ctx) => ctx.db.get(connectionId)))?.status).toBe("revoked");
     expect(await t.run(async (ctx) => ctx.db.query("providerCredentials").collect())).toHaveLength(0);
   });
+
+  test("scopes a GitHub installation binding to its active owner and project", async () => {
+    const t = convexTest(schema, modules);
+    const user = await t.withIdentity(identity("github-owner")).mutation(api.users.syncCurrent, {});
+    const other = await t.withIdentity(identity("other-owner")).mutation(api.users.syncCurrent, {});
+    const connectionId = await t.mutation(internal.providerOAuthStore.finalizeConnection, {
+      ownerId: user._id,
+      provider: "github",
+      accessTokenCiphertext: "v1.encrypted.access",
+      externalAccountRefCiphertext: "v1.encrypted.installation",
+      tokenType: "bearer",
+      scopes: [],
+      externalAccountIdHash: "github-account-hash",
+      accountLabel: "octocat",
+    });
+    const projectId = await t.run(async (ctx) => ctx.db.insert("projects", {
+      ownerId: user._id,
+      name: "Scoped app",
+      slug: "scoped-app",
+      status: "active",
+      githubRepositoryId: "12345",
+      githubRepositoryFullName: "octocat/scoped-app",
+      defaultBranch: "main",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    }));
+    expect(await t.query(internal.providerOAuthStore.loadGitHubInstallationBinding, {
+      ownerId: user._id,
+      projectId,
+    })).toEqual({
+      status: "ok",
+      externalAccountRefCiphertext: "v1.encrypted.installation",
+      repositoryId: "12345",
+      repositoryFullName: "octocat/scoped-app",
+    });
+    await expect(t.query(internal.providerOAuthStore.loadGitHubInstallationBinding, {
+      ownerId: other._id,
+      projectId,
+    })).rejects.toThrow("Credential scope is invalid");
+    await t.mutation(internal.providerOAuthStore.revokeConnection, { ownerId: user._id, provider: "github" });
+    expect(await t.query(internal.providerOAuthStore.loadGitHubInstallationBinding, {
+      ownerId: user._id,
+      projectId,
+    })).toEqual({ status: "reauth" });
+    expect(connectionId).toBeTruthy();
+  });
 });

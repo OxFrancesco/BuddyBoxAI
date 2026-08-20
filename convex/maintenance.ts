@@ -18,6 +18,7 @@ export const sweepExpired = internalMutation({
     channelMessages: v.number(),
     outboundDeliveries: v.number(),
     imessageClaims: v.number(),
+    xchatClaims: v.number(),
     providerOAuthStates: v.number(),
     auditRows: v.number(),
     usageBuckets: v.number(),
@@ -36,6 +37,8 @@ export const sweepExpired = internalMutation({
     const outboundDeliveries = await deleteRows(ctx, await ctx.db.query("outboundDeliveries")
       .withIndex("by_expires_at", (q) => q.lt("expiresAt", now)).take(BATCH_SIZE));
     const imessageClaims = await deleteRows(ctx, await ctx.db.query("imessageClaims")
+      .withIndex("by_expires_at", (q) => q.lt("expiresAt", now)).take(BATCH_SIZE));
+    const xchatClaims = await deleteRows(ctx, await ctx.db.query("xchatClaims")
       .withIndex("by_expires_at", (q) => q.lt("expiresAt", now)).take(BATCH_SIZE));
     const expiredPendingOAuthStates = await deleteRows(ctx, await ctx.db.query("providerOAuthStates")
       .withIndex("by_status_and_expires_at", (q) => q.eq("status", "pending").lt("expiresAt", now)).take(BATCH_SIZE));
@@ -68,6 +71,7 @@ export const sweepExpired = internalMutation({
       channelMessages,
       outboundDeliveries,
       imessageClaims,
+      xchatClaims,
       providerOAuthStates,
       auditRows,
       usageBuckets,

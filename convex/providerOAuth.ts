@@ -13,9 +13,16 @@ import {
 
 const providerValidator = v.union(
   v.literal("github"),
-  v.literal("cloudflare"),
   v.literal("convex"),
 );
+
+export type UserConnectableOAuthProvider = "github" | "convex";
+
+export function isUserConnectableOAuthProvider(
+  value: string,
+): value is UserConnectableOAuthProvider {
+  return value === "github" || value === "convex";
+}
 
 interface ProviderConfig {
   clientId: string;
@@ -23,6 +30,22 @@ interface ProviderConfig {
   authorizationEndpoint: string;
   tokenEndpoint: string;
   scopes: string[];
+}
+
+export function githubInstallationAuthorizationUrl(
+  configuredSlug: string | undefined,
+  state: string,
+): string {
+  const slug = configuredSlug?.trim().toLowerCase();
+  if (!slug || !/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/.test(slug)) {
+    throw new ConvexError({
+      code: "PROVIDER_NOT_CONFIGURED",
+      message: "GITHUB_APP_SLUG is not configured by the iChef operator",
+    });
+  }
+  const url = new URL(`https://github.com/apps/${slug}/installations/new`);
+  url.searchParams.set("state", state);
+  return url.toString();
 }
 
 interface ProviderToken {
@@ -38,6 +61,79 @@ interface VerifiedAccount {
   label: string;
   accountRef?: string;
 }
+
+type GitHubCredentialResolution =
+  | { status: "missing" | "reauth" }
+  | {
+      status: "ok";
+      installationId: number;
+      repositoryId: number;
+      repositoryFullName: string;
+    };
+
+export function parseGitHubInstallationBinding(
+  accountRef: string,
+  repositoryId: string,
+  repositoryFullName: string,
+): Exclude<GitHubCredentialResolution, { status: "missing" | "reauth" }> {
+  const parsed = asRecordOrNull(JSON.parse(accountRef));
+  const installationId = parsed ? Number(parsed.installationId) : Number.NaN;
+  const numericRepositoryId = Number(repositoryId);
+  if (
+    !Number.isSafeInteger(installationId) ||
+    installationId <= 0 ||
+    !Number.isSafeInteger(numericRepositoryId) ||
+    numericRepositoryId <= 0 ||
+    repositoryFullName.length > 200 ||
+    !/^[A-Za-z0-9](?:[A-Za-z0-9-]{0,38})\/[A-Za-z0-9_.-]{1,100}$/u.test(repositoryFullName)
+  ) {
+    throw new Error("GitHub installation binding is malformed");
+  }
+  return {
+    status: "ok",
+    installationId,
+    repositoryId: numericRepositoryId,
+    repositoryFullName,
+  };
+}
+
+export const resolveGitHubInstallationInternal = internalAction({
+  args: { ownerId: v.id("users"), projectId: v.id("projects") },
+  returns: v.union(
+    v.object({ status: v.literal("missing") }),
+    v.object({ status: v.literal("reauth") }),
+    v.object({
+      status: v.literal("ok"),
+      installationId: v.number(),
+      repositoryId: v.number(),
+      repositoryFullName: v.string(),
+    }),
+  ),
+  handler: async (ctx, args): Promise<GitHubCredentialResolution> => {
+    const binding: {
+      status: "missing" | "reauth" | "ok";
+      externalAccountRefCiphertext?: string;
+      repositoryId?: string;
+      repositoryFullName?: string;
+    } = await ctx.runQuery(internal.providerOAuthStore.loadGitHubInstallationBinding, args);
+    if (binding.status !== "ok") return { status: binding.status };
+    try {
+      const accountRef = await openProviderSecret(
+        binding.externalAccountRefCiphertext!,
+        args.ownerId,
+        "github",
+        "account",
+      );
+      return parseGitHubInstallationBinding(
+        accountRef,
+        binding.repositoryId!,
+        binding.repositoryFullName!,
+      );
+    } catch {
+      return { status: "reauth" };
+    }
+  },
+});
 
 export const start = action({
   args: { provider: providerValidator },
@@ -62,6 +158,14 @@ export const start = action({
       redirectUri,
       expiresAt: Date.now() + 10 * 60 * 1_000,
     });
+    if (args.provider === "github") {
+      return {
+        authorizationUrl: githubInstallationAuthorizationUrl(
+          process.env.GITHUB_APP_SLUG,
+          state,
+        ),
+      };
+    }
     const authorizationUrl = new URL(config.authorizationEndpoint);
     authorizationUrl.searchParams.set("client_id", config.clientId);
     authorizationUrl.searchParams.set("redirect_uri", redirectUri);
@@ -72,7 +176,6 @@ export const start = action({
     if (config.scopes.length > 0) {
       authorizationUrl.searchParams.set("scope", config.scopes.join(" "));
     }
-    if (args.provider === "github") authorizationUrl.searchParams.set("prompt", "select_account");
     return { authorizationUrl: authorizationUrl.toString() };
   },
 });
@@ -151,6 +254,12 @@ export const disconnect = action({
 });
 
 function providerConfig(provider: OAuthProvider): ProviderConfig {
+  if (!isUserConnectableOAuthProvider(provider)) {
+    throw new ConvexError({
+      code: "PROVIDER_NOT_CONFIGURED",
+      message: "Cloudflare is managed by iChef and is not a User Service Connection",
+    });
+  }
   if (provider === "github") {
     return requireConfig({
       clientId: process.env.GITHUB_APP_CLIENT_ID,
@@ -158,15 +267,6 @@ function providerConfig(provider: OAuthProvider): ProviderConfig {
       authorizationEndpoint: "https://github.com/login/oauth/authorize",
       tokenEndpoint: "https://github.com/login/oauth/access_token",
       scopes: [],
-    }, provider);
-  }
-  if (provider === "cloudflare") {
-    return requireConfig({
-      clientId: process.env.CLOUDFLARE_OAUTH_CLIENT_ID,
-      clientSecret: process.env.CLOUDFLARE_OAUTH_CLIENT_SECRET,
-      authorizationEndpoint: "https://dash.cloudflare.com/oauth2/auth",
-      tokenEndpoint: "https://dash.cloudflare.com/oauth2/token",
-      scopes: splitScopes(process.env.CLOUDFLARE_OAUTH_SCOPES),
     }, provider);
   }
   return requireConfig({
@@ -189,12 +289,6 @@ function requireConfig(
     throw new ConvexError({
       code: "PROVIDER_NOT_CONFIGURED",
       message: `${provider} OAuth is not configured by the iChef operator`,
-    });
-  }
-  if (provider === "cloudflare" && config.scopes.length === 0) {
-    throw new ConvexError({
-      code: "PROVIDER_NOT_CONFIGURED",
-      message: "Cloudflare OAuth scopes are not configured by the iChef operator",
     });
   }
   return { ...config, clientId: config.clientId, clientSecret: config.clientSecret };
@@ -304,29 +398,7 @@ async function verifyAccount(provider: OAuthProvider, accessToken: string): Prom
       accountRef: JSON.stringify({ installationId: String(installationRecord.id), login: user.login }),
     };
   }
-  if (provider === "cloudflare") {
-    const headers = { authorization: `Bearer ${accessToken}`, accept: "application/json" };
-    const [identityResponse, accountsResponse] = await Promise.all([
-      fetch("https://dash.cloudflare.com/oauth2/userinfo", { headers, redirect: "error" }),
-      fetch("https://api.cloudflare.com/client/v4/accounts?per_page=50", { headers, redirect: "error" }),
-    ]);
-    const identity = await readJsonObject(identityResponse);
-    const accountsBody = await readJsonObject(accountsResponse);
-    const accounts = Array.isArray(accountsBody.result) ? accountsBody.result.map(asRecordOrNull).filter(Boolean) : [];
-    if (!identityResponse.ok || typeof identity.sub !== "string" || !accountsResponse.ok || accounts.length < 1) {
-      throw new Error("Cloudflare account verification failed");
-    }
-    const first = accounts[0] as Record<string, unknown>;
-    const label = typeof first.name === "string" ? first.name : "Cloudflare account";
-    const accountIds = accounts
-      .map((account) => account && (typeof account.id === "string" ? account.id : undefined))
-      .filter((id): id is string => Boolean(id));
-    return {
-      id: identity.sub,
-      label: `${label}${accounts.length > 1 ? ` (+${accounts.length - 1})` : ""}`.slice(0, 160),
-      accountRef: JSON.stringify({ accountIds }),
-    };
-  }
+  if (!isUserConnectableOAuthProvider(provider)) throw new Error("Provider is not user-connectable");
   const response = await fetch("https://api.convex.dev/v1/token_details", {
     headers: { authorization: `Bearer ${accessToken}`, accept: "application/json" },
     redirect: "error",
@@ -357,14 +429,6 @@ async function bestEffortUpstreamRevoke(provider: OAuthProvider, accessToken: st
           "user-agent": "iChef/0.1",
         },
         body: JSON.stringify({ access_token: accessToken }),
-        redirect: "error",
-      });
-    } else if (provider === "cloudflare") {
-      const config = providerConfig(provider);
-      await fetch("https://dash.cloudflare.com/oauth2/revoke", {
-        method: "POST",
-        headers: { "content-type": "application/x-www-form-urlencoded" },
-        body: new URLSearchParams({ token: accessToken, client_id: config.clientId, client_secret: config.clientSecret }),
         redirect: "error",
       });
     }

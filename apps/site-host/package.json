@@ -1,0 +1,19 @@
+{
+  "name": "@ichef/site-host",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "test": "bun test",
+    "typecheck": "tsc --noEmit",
+    "types": "wrangler types worker-configuration.d.ts --include-runtime=false",
+    "deploy:dry": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^5.20260813.1",
+    "@types/bun": "^1.3.14",
+    "typescript": "^5.9.3",
+    "wrangler": "^4.123.0"
+  }
+}

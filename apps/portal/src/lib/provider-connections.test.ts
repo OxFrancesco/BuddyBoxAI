@@ -21,6 +21,10 @@ describe("provider connection prerequisites", () => {
     expect(github.gateNotice).toContain("Project creation stays locked");
   });
 
+  test("does not expose Cloudflare as a user-authorized provider", () => {
+    expect("cloudflare" in providerConnectionRequirements).toBe(false);
+  });
+
   test("turns missing operator credentials into a safe configuration state", () => {
     expect(classifyProviderAuthorizationError({
       data: { code: "PROVIDER_NOT_CONFIGURED", message: "GitHub OAuth is not configured" },

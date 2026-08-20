@@ -7,7 +7,8 @@
     "dev": "vite dev --host 0.0.0.0 --port 3007",
     "build": "vite build",
     "preview": "vite preview --port 3007",
-    "deploy": "bun run build && wrangler deploy",
+    "build:production": "ICHEF_PRODUCTION_BUILD=1 CLOUDFLARE_LOAD_DEV_VARS_FROM_DOT_ENV=false CLERK_PUBLISHABLE_KEY=pk_test_bGVhZGluZy1oZW4tNjcuY2xlcmsuYWNjb3VudHMuZGV2JA VITE_CLERK_PUBLISHABLE_KEY=pk_test_bGVhZGluZy1oZW4tNjcuY2xlcmsuYWNjb3VudHMuZGV2JA CONVEX_URL=https://wry-meerkat-833.convex.cloud VITE_CONVEX_URL=https://wry-meerkat-833.convex.cloud vite build",
+    "deploy": "bun run build:production && wrangler deploy",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "cf-typegen": "wrangler types"

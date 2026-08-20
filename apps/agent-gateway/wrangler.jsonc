@@ -11,7 +11,8 @@
   },
   "services": [
     { "binding": "CONTROL_PLANE", "service": "ichef-control-plane" },
-    { "binding": "CREDENTIAL_BROKER", "service": "ichef-credential-broker" }
+    { "binding": "CREDENTIAL_BROKER", "service": "ichef-credential-broker" },
+    { "binding": "SITE_HOST", "service": "ichef-site-host" }
   ],
   "r2_buckets": [
     { "binding": "CHECKPOINTS", "bucket_name": "ichef-agent-checkpoints" }
