@@ -1,26 +1,36 @@
 import { verifyCapability } from "./capability";
+import { orchestrateRun, type OrchestratorEnv } from "./orchestrator";
 
-interface Env { GATEWAY_CAPABILITY_SECRET: string }
+interface Env extends OrchestratorEnv {}
 
-export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
-    const url = new URL(request.url);
-    if (request.method !== "POST" || url.pathname !== "/v1/agent-gateway/authenticate") return new Response("Not found", { status: 404 });
-    const authorization = request.headers.get("authorization");
-    if (!authorization?.startsWith("Bearer ")) return new Response("Unauthorized", { status: 401 });
-    const capability = await verifyCapability(authorization.slice(7), env.GATEWAY_CAPABILITY_SECRET);
-    if (!capability) return new Response("Unauthorized", { status: 401 });
-    return Response.json({
-      userId: capability.sub,
-      projectId: capability.projectId,
-      sandboxGeneration: capability.sandboxGeneration,
-      action: capability.action,
-      ...(capability.runId ? { runId: capability.runId } : {}),
-      ...(capability.releaseId ? { releaseId: capability.releaseId } : {}),
-      ...(capability.sourceRunId ? { sourceRunId: capability.sourceRunId } : {}),
-      ...(capability.commitSha ? { commitSha: capability.commitSha } : {}),
-      ...(capability.hostname ? { hostname: capability.hostname } : {}),
-      ...(capability.artifactManifestDigest ? { artifactManifestDigest: capability.artifactManifestDigest } : {}),
-    }, { headers: { "cache-control": "no-store" } });
-  },
-} satisfies ExportedHandler<Env>;
+export function createHandler(now = () => Math.floor(Date.now() / 1000)) {
+  return {
+    async fetch(request: Request, env: Env): Promise<Response> {
+      const url = new URL(request.url);
+      if (request.method === "POST" && url.pathname === "/v1/orchestration/runs") {
+        return await orchestrateRun(request, env, now);
+      }
+      if (request.method !== "POST" || url.pathname !== "/v1/agent-gateway/authenticate") {
+        return new Response("Not found", { status: 404 });
+      }
+      const authorization = request.headers.get("authorization");
+      if (!authorization?.startsWith("Bearer ")) return new Response("Unauthorized", { status: 401 });
+      const capability = await verifyCapability(authorization.slice(7), env.GATEWAY_CAPABILITY_SECRET);
+      if (!capability) return new Response("Unauthorized", { status: 401 });
+      return Response.json({
+        userId: capability.sub,
+        projectId: capability.projectId,
+        sandboxGeneration: capability.sandboxGeneration,
+        action: capability.action,
+        ...(capability.runId ? { runId: capability.runId } : {}),
+        ...(capability.releaseId ? { releaseId: capability.releaseId } : {}),
+        ...(capability.sourceRunId ? { sourceRunId: capability.sourceRunId } : {}),
+        ...(capability.commitSha ? { commitSha: capability.commitSha } : {}),
+        ...(capability.hostname ? { hostname: capability.hostname } : {}),
+        ...(capability.artifactManifestDigest ? { artifactManifestDigest: capability.artifactManifestDigest } : {}),
+      }, { headers: { "cache-control": "no-store" } });
+    },
+  } satisfies ExportedHandler<Env>;
+}
+
+export default createHandler();

@@ -1,6 +1,8 @@
 import { ConvexError, v } from "convex/values";
 
+import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
+import { consumeApproval } from "./approvals";
 import { assertOwner, requireCurrentUser } from "./lib/auth";
 import { boundedLimit, requireBoundedString } from "./lib/bounds";
 import { projectReadiness } from "./lib/readiness";
@@ -30,7 +32,10 @@ export const propose = mutation({
     payloadHash: v.string(),
     expiresAt: v.number(),
   },
-  returns: v.id("proposedProjects"),
+  returns: v.object({
+    proposalId: v.id("proposedProjects"),
+    approvalId: v.id("approvals"),
+  }),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx);
     const readiness = await projectReadiness(ctx, user._id);
@@ -48,22 +53,110 @@ export const propose = mutation({
     if (args.planJson.length > 64_000 || args.brief.length > 8_000) {
       throw new ConvexError({ code: "PROPOSAL_TOO_LARGE", message: "Proposed Project payload is too large" });
     }
+    const name = requireBoundedString(args.name, "name", 120);
+    const brief = args.brief.trim();
+    const payloadHash = requireBoundedString(args.payloadHash, "payloadHash", 64).toLowerCase();
+    if (!/^[a-f0-9]{64}$/u.test(payloadHash)) {
+      throw new ConvexError({ code: "INVALID_PAYLOAD_HASH", message: "Proposal payload hash must be SHA-256" });
+    }
     const now = Date.now();
     if (args.expiresAt <= now || args.expiresAt > now + 24 * 60 * 60 * 1_000) {
       throw new ConvexError({ code: "INVALID_EXPIRY", message: "Proposal must expire within 24 hours" });
     }
-    return await ctx.db.insert("proposedProjects", {
+    const existing = await ctx.db.query("proposedProjects")
+      .withIndex("by_owner_id_and_payload_hash", (q) =>
+        q.eq("ownerId", user._id).eq("payloadHash", payloadHash),
+      )
+      .order("desc")
+      .first();
+    if (
+      existing && existing.status === "awaiting_approval" && existing.expiresAt > now &&
+      existing.approvalId
+    ) {
+      if (
+        existing.name !== name || existing.brief !== brief || existing.planJson !== args.planJson ||
+        existing.conversationId !== args.conversationId
+      ) {
+        throw new ConvexError({
+          code: "PROPOSAL_HASH_REUSED",
+          message: "Proposal hash is already bound to different content",
+        });
+      }
+      return { proposalId: existing._id, approvalId: existing.approvalId };
+    }
+    const proposalId = await ctx.db.insert("proposedProjects", {
       ownerId: user._id,
       conversationId: args.conversationId,
-      name: requireBoundedString(args.name, "name", 120),
-      brief: args.brief.trim(),
+      name,
+      brief,
       planJson: args.planJson,
-      payloadHash: args.payloadHash,
+      payloadHash,
       status: "awaiting_approval",
+      provisioningStatus: "pending",
+      provisioningAttempts: 0,
       expiresAt: args.expiresAt,
       createdAt: now,
       updatedAt: now,
     });
+    const approvalId = await ctx.db.insert("approvals", {
+      ownerId: user._id,
+      operation: "confirm_project",
+      bindingHash: payloadHash,
+      status: "pending",
+      expiresAt: args.expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(proposalId, { approvalId });
+    return { proposalId, approvalId };
+  },
+});
+
+export const confirmProposal = mutation({
+  args: {
+    approvalId: v.id("approvals"),
+    bindingHash: v.string(),
+  },
+  returns: v.object({
+    proposalId: v.id("proposedProjects"),
+    approvalId: v.id("approvals"),
+    scheduled: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx);
+    const bindingHash = requireBoundedString(args.bindingHash, "bindingHash", 64).toLowerCase();
+    if (!/^[a-f0-9]{64}$/u.test(bindingHash)) {
+      throw new ConvexError({ code: "INVALID_PAYLOAD_HASH", message: "Proposal payload hash must be SHA-256" });
+    }
+    const proposal = await ctx.db
+      .query("proposedProjects")
+      .withIndex("by_approval_id", (q) => q.eq("approvalId", args.approvalId))
+      .unique();
+    if (
+      !proposal ||
+      proposal.approvalId !== args.approvalId ||
+      proposal.status !== "awaiting_approval" ||
+      proposal.expiresAt <= Date.now()
+    ) {
+      throw new ConvexError({ code: "INVALID_PROPOSAL", message: "Proposal is not confirmable" });
+    }
+    const approval = await ctx.db.get(args.approvalId);
+    if (
+      approval?.ownerId === user._id && approval.operation === "confirm_project" &&
+      approval.bindingHash === bindingHash && approval.status === "consumed"
+    ) {
+      return { proposalId: proposal._id, approvalId: args.approvalId, scheduled: true };
+    }
+    await consumeApproval(ctx, {
+      ownerId: user._id,
+      approvalId: args.approvalId,
+      bindingHash,
+    });
+    await ctx.scheduler.runAfter(0, internal.orchestrator.provisionProposal, {
+      proposalId: proposal._id,
+      approvalId: args.approvalId,
+    });
+    return { proposalId: proposal._id, approvalId: args.approvalId, scheduled: true };
   },
 });
 
@@ -75,6 +168,7 @@ export const createProvisioned = internalMutation({
     slug: v.string(),
     githubRepositoryId: v.string(),
     githubRepositoryFullName: v.string(),
+    defaultBranch: v.optional(v.string()),
     convexProjectRef: v.string(),
     clerkApplicationRef: v.optional(v.string()),
   },
@@ -118,7 +212,7 @@ export const createProvisioned = internalMutation({
       status: "active",
       githubRepositoryId: args.githubRepositoryId,
       githubRepositoryFullName: args.githubRepositoryFullName,
-      defaultBranch: "main",
+      defaultBranch: args.defaultBranch ?? "main",
       convexProjectRef: args.convexProjectRef,
       clerkApplicationRef: args.clerkApplicationRef,
       createdAt: now,
@@ -138,7 +232,13 @@ export const createProvisioned = internalMutation({
       });
     }
     await ctx.db.patch(projectId, { hostingHostname });
-    await ctx.db.patch(proposal._id, { status: "confirmed", confirmedProjectId: projectId, updatedAt: now });
+    await ctx.db.patch(proposal._id, {
+      status: "confirmed",
+      provisioningStatus: "completed",
+      provisioningErrorCode: undefined,
+      confirmedProjectId: projectId,
+      updatedAt: now,
+    });
     await writeAudit(ctx, {
       ownerId: owner._id, actor: "gateway", action: "project.created",
       targetType: "project", targetId: projectId, outcome: "succeeded",

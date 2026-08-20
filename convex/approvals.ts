@@ -23,7 +23,7 @@ const approvalValidator = v.object({
   updatedAt: v.number(),
 });
 
-async function consumeApproval(
+export async function consumeApproval(
   ctx: MutationCtx,
   args: {
     ownerId: Id<"users">;

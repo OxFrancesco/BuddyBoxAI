@@ -51,16 +51,18 @@ enabled.
 ## Current launch limitations
 
 - The public technical preview currently uses iChef's real Clerk development
-  instance; Google is intentionally the only general login method. A matching
-  production Clerk instance, keys, and verified Frontend API DNS still need to
-  replace it after the operator explicitly accepts Google's User Data Policy.
+  instance; Google is intentionally the only general login method. The Clerk
+  production instance and custom domain exist, but production Google OAuth
+  credentials and the key cutover are intentionally deferred.
 - GitHub and Convex authorization-code + PKCE callbacks are
   implemented and fail closed, but their production OAuth applications still
   need to be registered and their server-side client credentials configured.
 - Managed project hosting is deployed under `*-ichef-sites.buddytools.org` with
   immutable R2 releases and a private publish boundary. The portal can save a
-  bounded Project proposal, but it does not claim that a repository or site was
-  provisioned. Users are never asked for Cloudflare OAuth.
+  bounded, approval-bound Project proposal. The production orchestrator can
+  provision its repository and start the first sandbox Run once the required
+  GitHub, Convex, ChatGPT, and messaging operator integrations are live. Users
+  are never asked for Cloudflare OAuth.
 - The Spectrum bridge is built and container-verified, but no live Spectrum
   project, line, webhook, or Railway service has been supplied yet; iMessage
   delivery is therefore not live.
@@ -68,10 +70,10 @@ enabled.
   a live X developer application, API credits, OAuth grant, X Chat key registration,
   Juicebox realm, webhook, and persistent Railway volume are still required.
 - Project and run domain APIs, the Pi Sandbox runtime, user-owned GitHub
-  provisioning, previews, checkpoints, approvals, and release state exist, but
-  the production capability issuer/orchestrator that turns an approved proposal
-  into those operations is not wired yet. The live iMessage-to-run path also
-  cannot be exercised without Spectrum.
+  provisioning, previews, checkpoints, approvals, release state, and the
+  production capability issuer/orchestrator are wired. The live iMessage-to-run
+  path still cannot be exercised without Spectrum, and X Chat requires its own
+  operator application and durable bridge deployment.
 - Automated user-owned Clerk app provisioning depends on Clerk for Platforms
   private-beta access or the documented keyless/accountless claim handoff.
 

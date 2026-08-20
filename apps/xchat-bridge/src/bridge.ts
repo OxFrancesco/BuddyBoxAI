@@ -95,7 +95,7 @@ export class XChatBridge {
       sha256(message.text),
     ]);
     const encryptedPayload = await this.#protector.seal(
-      { text: message.text },
+      { text: message.text, conversationId: message.conversationId },
       `xchat:inbound:${eventUuid}`,
     );
     const directReplyId = `claim:${message.eventUuid}`;

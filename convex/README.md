@@ -13,6 +13,11 @@
   `ichef-sites.buddytools.org`; project hosts append it inside a first-level DNS label.
 - `ICHEF_SITE_HOST_SECRET` authenticates the private site-host broker. Use a
   distinct random value of at least 32 characters and never expose it to users.
+- `ICHEF_ORCHESTRATOR_SECRET` authenticates Convex actions to the private
+  capability-issuing control-plane route. Configure the exact same random value
+  as a secret on `ichef-control-plane`; never expose it to a browser or Sandbox.
+- `ICHEF_ORCHESTRATOR_URL` is optional and defaults to
+  `https://ichef.buddytools.org/v1/orchestration/runs`.
 
 This directory is the durable, multi-User control plane for iChef. Convex owns
 identity bindings, connections, Projects, Conversations, Runs, sanitized Run

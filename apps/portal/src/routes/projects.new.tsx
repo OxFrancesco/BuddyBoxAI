@@ -13,6 +13,7 @@ import {
 import { type FormEvent, useState } from "react";
 
 import { api } from "../../../../convex/_generated/api";
+import type { Id } from "../../../../convex/_generated/dataModel";
 import { BrandMark } from "~/components/brand-mark";
 import { Button } from "~/components/ui/button";
 import {
@@ -32,11 +33,17 @@ function NewProject() {
   const { isAuthenticated } = useConvexAuth();
   const syncCurrent = useMutation(api.users.syncCurrent);
   const propose = useMutation(api.projects.propose);
+  const confirmProposal = useMutation(api.projects.confirmProposal);
   const [name, setName] = useState("");
   const [brief, setBrief] = useState("");
   const [errors, setErrors] = useState<FormErrors>({});
-  const [status, setStatus] = useState<"idle" | "submitting" | "submitted">("idle");
-  const [submitted, setSubmitted] = useState<{ name: string; expiresAt: number } | null>(null);
+  const [status, setStatus] = useState<"idle" | "submitting" | "submitted" | "starting" | "started">("idle");
+  const [submitted, setSubmitted] = useState<{
+    name: string;
+    expiresAt: number;
+    approvalId: Id<"approvals">;
+    bindingHash: string;
+  } | null>(null);
 
   if (isLoaded && !user) {
     return <Navigate to="/sign-in/$" params={{ _splat: "" }} />;
@@ -65,14 +72,35 @@ function NewProject() {
         imageUrl: user.imageUrl,
       });
       const payload = await buildProjectProposal(validation.value);
-      await propose(payload);
-      setSubmitted({ name: payload.name, expiresAt: payload.expiresAt });
+      const result = await propose(payload);
+      setSubmitted({
+        name: payload.name,
+        expiresAt: payload.expiresAt,
+        approvalId: result.approvalId,
+        bindingHash: payload.payloadHash,
+      });
       setStatus("submitted");
     } catch {
       setErrors({
         form: "iChef could not save this proposal. Check that every setup step is connected, then try again.",
       });
       setStatus("idle");
+    }
+  };
+
+  const approveAndStart = async () => {
+    if (!submitted || status === "starting") return;
+    setErrors({});
+    setStatus("starting");
+    try {
+      await confirmProposal({
+        approvalId: submitted.approvalId,
+        bindingHash: submitted.bindingHash,
+      });
+      setStatus("started");
+    } catch {
+      setErrors({ form: "iChef could not start provisioning. Reconnect any expired service and try again." });
+      setStatus("submitted");
     }
   };
 
@@ -103,19 +131,31 @@ function NewProject() {
         </div>
 
         <div className="proposal-card">
-          {status === "submitted" && submitted ? (
+          {(status === "submitted" || status === "starting" || status === "started") && submitted ? (
             <div className="proposal-success" role="status">
               <span className="proposal-success__icon"><Check size={24} /></span>
-              <p className="eyebrow">Awaiting approval</p>
+              <p className="eyebrow">{status === "started" ? "Provisioning queued" : "Awaiting approval"}</p>
               <h2>{submitted.name} is on the pass.</h2>
-              <p>
-                The proposal is saved until {new Date(submitted.expiresAt).toLocaleString()}.
-                It is awaiting the messaging approval workflow; live channel delivery is still pending operator configuration.
-              </p>
+              {status === "started" ? (
+                <p>The bound plan is approved. iChef is creating the repository and starting the first verified sandbox Run.</p>
+              ) : (
+                <p>
+                  Approve here, or reply <strong>APPROVE {submitted.bindingHash.slice(0, 8).toUpperCase()}</strong> from your verified iMessage or X Chat. The proposal expires {new Date(submitted.expiresAt).toLocaleString()}.
+                </p>
+              )}
               <div className="proposal-truth-note">
                 <ClipboardCheck size={18} />
-                <span><strong>Nothing has been provisioned yet.</strong> No GitHub repository or live site exists for this proposal.</span>
+                <span>{status === "started"
+                  ? <><strong>The operation is queued, not yet complete.</strong> Run verification decides the truthful outcome.</>
+                  : <><strong>Nothing has been provisioned yet.</strong> No GitHub repository or live site exists for this proposal.</>}</span>
               </div>
+              {errors.form ? <div className="connect-notice is-error" role="alert">{errors.form}</div> : null}
+              {status !== "started" ? (
+                <Button type="button" size="lg" disabled={status === "starting"} onClick={() => void approveAndStart()}>
+                  {status === "starting" ? "Starting provisioning…" : "Approve & begin"}
+                  {status !== "starting" ? <ArrowRight size={16} /> : null}
+                </Button>
+              ) : null}
               <Button asChild size="lg"><Link to="/">Return to setup <ArrowRight size={16} /></Link></Button>
             </div>
           ) : (

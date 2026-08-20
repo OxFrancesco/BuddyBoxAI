@@ -70,18 +70,10 @@ router.route({
           outboundIdempotencyKey: idempotencyKey,
           outboundPayloadCiphertext: await encryptBridgePayload(outbound),
         });
-        if (admitted.status === "accepted" && admitted.activeProjectId) {
-          try {
-            await ctx.runMutation(internal.runs.admit, {
-              ownerId: admitted.ownerId,
-              projectId: admitted.activeProjectId,
-              commandKey: normalized.idempotencyKey,
-              instructionHash: await sha256(normalized.text),
-            });
-          } catch {
-            // A concurrent active Run is an expected admission outcome. The
-            // encrypted inbound remains durable for ordered processing.
-          }
+        if (admitted.status === "accepted") {
+          await ctx.scheduler.runAfter(0, internal.orchestrator.dispatchInboundDelivery, {
+            deliveryId: admitted.deliveryId,
+          });
         }
         const result = admitted.status === "unbound"
           ? { status: "unbound", deliveryId: admitted.deliveryId, outbound }
@@ -200,6 +192,11 @@ router.route({
           ),
           occurredAt: numberField(input, "occurredAt", 0, Number.MAX_SAFE_INTEGER),
         });
+        if (result.status === "accepted") {
+          await ctx.scheduler.runAfter(0, internal.orchestrator.dispatchInboundDelivery, {
+            deliveryId: result.deliveryId,
+          });
+        }
         return json({ ok: true, result });
       }
       if (operation === "complete_challenge") {

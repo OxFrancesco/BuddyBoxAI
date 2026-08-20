@@ -14,6 +14,7 @@ const modules = {
   "./conversations.ts": () => import("./conversations"),
   "./deletions.ts": () => import("./deletions"),
   "./maintenance.ts": () => import("./maintenance"),
+  "./orchestrator.ts": () => import("./orchestrator"),
   "./projects.ts": () => import("./projects"),
   "./releases.ts": () => import("./releases"),
   "./runEvents.ts": () => import("./runEvents"),
@@ -92,6 +93,99 @@ async function readyUserFixture(t: ReturnType<typeof convexTest>, subject: strin
 }
 
 describe("authenticated Convex control plane", () => {
+  test("atomically binds every Proposed Project to a pending confirmation Approval", async () => {
+    const t = convexTest(schema, modules);
+    const alice = await readyUserFixture(t, "proposal-alice");
+    const expiresAt = Date.now() + 60_000;
+    const { proposalId, approvalId } = await alice.authenticated.mutation(api.projects.propose, {
+      name: "Seasonal Field Notes",
+      brief: "A signed-in guide for saving seasonal ingredient notes.",
+      planJson: JSON.stringify({ version: 1 }),
+      payloadHash: "a".repeat(64),
+      expiresAt,
+    });
+    const [proposal, approvals] = await t.run((ctx) => Promise.all([
+      ctx.db.get(proposalId),
+      ctx.db.query("approvals")
+        .withIndex("by_owner_id_and_binding_hash", (q) =>
+          q.eq("ownerId", alice.user._id).eq("bindingHash", "a".repeat(64)),
+        )
+        .collect(),
+    ]));
+
+    expect(proposal?.status).toBe("awaiting_approval");
+    expect(approvals).toHaveLength(1);
+    expect(approvalId).toBe(approvals[0]!._id);
+    expect(approvals[0]).toMatchObject({
+      ownerId: alice.user._id,
+      operation: "confirm_project",
+      bindingHash: "a".repeat(64),
+      status: "pending",
+      expiresAt,
+    });
+
+    const retry = await alice.authenticated.mutation(api.projects.propose, {
+      name: "Seasonal Field Notes",
+      brief: "A signed-in guide for saving seasonal ingredient notes.",
+      planJson: JSON.stringify({ version: 1 }),
+      payloadHash: "a".repeat(64),
+      expiresAt,
+    });
+    expect(retry).toEqual({ proposalId, approvalId });
+    expect(await t.run((ctx) => ctx.db.query("proposedProjects")
+      .withIndex("by_owner_id_and_payload_hash", (q) =>
+        q.eq("ownerId", alice.user._id).eq("payloadHash", "a".repeat(64)),
+      )
+      .collect())).toHaveLength(1);
+    await expect(alice.authenticated.mutation(api.projects.propose, {
+      name: "Different project",
+      brief: "A different payload cannot borrow the same approval binding.",
+      planJson: JSON.stringify({ version: 1, changed: true }),
+      payloadHash: "a".repeat(64),
+      expiresAt,
+    })).rejects.toThrow("already bound to different content");
+
+    const confirmation = await alice.authenticated.mutation(api.projects.confirmProposal, {
+      approvalId: approvals[0]!._id,
+      bindingHash: "a".repeat(64),
+    });
+    expect(confirmation).toEqual({
+      proposalId,
+      approvalId: approvals[0]!._id,
+      scheduled: true,
+    });
+    expect((await t.run((ctx) => ctx.db.get(approvals[0]!._id)))?.status).toBe("consumed");
+    expect(await alice.authenticated.mutation(api.projects.confirmProposal, {
+      approvalId: approvals[0]!._id,
+      bindingHash: "a".repeat(64),
+    })).toEqual(confirmation);
+
+    const secondHash = "b".repeat(64);
+    const second = await alice.authenticated.mutation(api.projects.propose, {
+      name: "Kitchen Ledger",
+      brief: "A small shared ledger for recipes and prep notes.",
+      planJson: JSON.stringify({ version: 1 }),
+      payloadHash: secondHash,
+      expiresAt: Date.now() + 60_000,
+    });
+    const delivery = await t.mutation(internal.channels.recordDelivery, {
+      ownerId: alice.user._id,
+      imessageConnectionId: alice.connectionId,
+      direction: "inbound",
+      providerMessageId: "spectrum-confirm-project",
+      messageHash: "approval-message-hash",
+      status: "accepted",
+      occurredAt: Date.now(),
+    });
+    expect(await t.mutation(internal.orchestrator.confirmProposalForDelivery, {
+      ownerId: alice.user._id,
+      deliveryId: delivery.deliveryId,
+      approvalCode: secondHash.slice(0, 8).toUpperCase(),
+    })).toEqual({ matched: true, proposalId: second.proposalId, approvalId: second.approvalId });
+    expect((await t.run((ctx) => ctx.db.get(second.approvalId)))?.consumedByDeliveryId)
+      .toBe(delivery.deliveryId);
+  });
+
   test("managed hosting assigns collision-safe hostnames and atomically activates a release", async () => {
     const t = convexTest(schema, modules);
     const alice = await readyUserFixture(t, "hosting-alice");

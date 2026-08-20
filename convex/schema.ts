@@ -196,7 +196,16 @@ export default defineSchema({
     brief: v.string(),
     planJson: v.string(),
     payloadHash: v.string(),
+    approvalId: v.optional(v.id("approvals")),
     status: proposedProjectStatusValidator,
+    provisioningStatus: v.optional(v.union(
+      v.literal("pending"),
+      v.literal("running"),
+      v.literal("failed"),
+      v.literal("completed"),
+    )),
+    provisioningAttempts: v.optional(v.number()),
+    provisioningErrorCode: v.optional(v.string()),
     expiresAt: v.number(),
     confirmedProjectId: v.optional(v.id("projects")),
     createdAt: v.number(),
@@ -204,6 +213,8 @@ export default defineSchema({
   })
     .index("by_owner_id_and_created_at", ["ownerId", "createdAt"])
     .index("by_owner_id_and_status", ["ownerId", "status"])
+    .index("by_owner_id_and_payload_hash", ["ownerId", "payloadHash"])
+    .index("by_approval_id", ["approvalId"])
     .index("by_status_and_expires_at", ["status", "expiresAt"]),
 
   projects: defineTable({
