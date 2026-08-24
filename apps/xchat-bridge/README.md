@@ -26,6 +26,14 @@ leased replies with durable provider idempotency.
   `xchat:inbound:<hashed-event-uuid>` before admission.
 - The Chat XDK bot PIN, OAuth tokens, private material, conversation keys,
   message bodies, and provider routing IDs are never logged.
+- Every process start fetches the authenticated bot's current public-key
+  records from X. The bridge selects the newest record carrying
+  `juicebox_config`, validates and uses only its fresh `token_map` realm
+  credentials, recovers the private identity with `X_CHAT_PIN`, then adopts
+  the key version whose registered `public_key` matches the recovered key.
+  Startup fails closed if the response, realm map, recovery, or key match is
+  invalid. No static Juicebox config, realm-token map, or key version is read
+  from Railway.
 - `XCHAT_VAULT_ENCRYPTION_KEY` is intentionally distinct from the Convex route
   key. Rotate it only with an offline vault migration or after discarding the
   vault and rehydrating conversation keys through verified X events.
@@ -87,11 +95,50 @@ bun run --cwd apps/xchat-bridge verify
 docker build -f apps/xchat-bridge/Dockerfile -t buddybox-xchat-bridge .
 ```
 
+Provisioning is an idempotent JSON command with five phases:
+
+```sh
+bun run --cwd apps/xchat-bridge provision -- status
+bun run --cwd apps/xchat-bridge provision -- identity
+bun run --cwd apps/xchat-bridge provision -- identity-rotate
+bun run --cwd apps/xchat-bridge provision -- webhook
+bun run --cwd apps/xchat-bridge provision -- subscription
+bun run --cwd apps/xchat-bridge provision -- all
+```
+
+`status` only inspects. `webhook` reuses a registration only when its URL is an
+exact `X_WEBHOOK_URL` match, and `subscription` reuses only the exact
+`chat.received` + bot user + webhook + `buddybox-xchat` tag tuple. X Activity
+listing and creation use the App bearer; the bot's OAuth user grant and scopes
+authorize its private Chat event eligibility. `all` may create the webhook and
+subscription, but never generates or registers identity keys. The explicit
+`identity` phase performs the official first-boot sequence: generate a key,
+reconcile it against the account, register it once when absent, fetch the new
+Juicebox config, store the private identity under `X_CHAT_PIN`, and only then
+write a completion marker to the encrypted `/data` vault. Weak PINs are rejected
+before the rate-limited public-key write. A pending marker is written before the
+POST so a crash or ambiguous response can never cause an automatic second key;
+definite non-application responses such as `429` clear that marker for a safe
+retry in the next window.
+
+If the account already has keys that the configured PIN cannot recover, rotation
+is never automatic. Run `identity-rotate` only with the one-command environment
+confirmation `X_CHAT_ROTATION_CONFIRM_USER_ID=<exact numeric bot user id>`; this
+deliberately consumes the account's limited public-key registration budget.
+
+Webhook and Activity management use the separate provisioning-only
+`X_APP_BEARER_TOKEN`; the long-running bridge does not read or require it.
+Provider JSON is validated before use, and command failures emit only redacted
+machine-readable codes. Identity status is ready only when the OAuth grant
+resolves to `X_CHAT_USER_ID`, fresh Juicebox material unlocks with the configured
+PIN, and the recovered key matches an account public key. The runtime repeats
+those recovery checks before accepting traffic.
+
 Copy `.env.example` into Railway secrets, mount `/data`, deploy one replica,
 register `https://<railway-host>/v1/xchat/webhook`, then create the
-`chat.received` activity subscription for `X_CHAT_USER_ID`. Production remains
-blocked until the X developer App, OAuth user grant, public Chat key record,
-secure-backup realm tokens, webhook, and subscription exist.
+`chat.received` activity subscription for `X_CHAT_USER_ID`. Production is ready
+only after the X developer App, OAuth user grant, PIN-backed public Chat key
+record, webhook, and subscription exist and `/readyz` succeeds.
 
 Current official sources and implementation conclusions are captured in
 [`docs/xchat-api-research.md`](./docs/xchat-api-research.md).

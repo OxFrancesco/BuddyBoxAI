@@ -6,12 +6,13 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun src/index.ts",
+    "provision": "bun src/provision-cli.ts",
     "test": "bun test",
     "typecheck": "bunx tsc --noEmit",
     "verify": "bun run typecheck && bun test"
   },
   "dependencies": {
-    "@xdevplatform/chat-xdk": "0.4.3",
+    "@xdevplatform/chat-xdk": "0.5.0",
     "juicebox-sdk": "0.3.0",
     "zod": "4.4.3"
   },

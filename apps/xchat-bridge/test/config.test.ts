@@ -6,10 +6,7 @@ const env = {
   X_API_CONSUMER_SECRET: "consumer_secret_long_enough",
   X_OAUTH_ACCESS_TOKEN: "user_access_token",
   X_CHAT_USER_ID: "123456",
-  X_CHAT_KEY_VERSION: "42",
-  X_CHAT_JUICEBOX_CONFIG: '{"token_map":[]}',
   X_CHAT_PIN: "safe-pin-value",
-  X_CHAT_REALM_TOKENS_JSON: '{"abcd":"realm-token"}',
   CONVEX_XCHAT_BROKER_URL: "https://example.convex.site/v1/xchat/broker",
   BUDDYBOX_BRIDGE_SECRET: "bridge_secret_long_enough",
   BUDDYBOX_ROUTE_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
@@ -25,6 +22,13 @@ describe("configuration", () => {
       pollIntervalMs: 2000,
       portalUrl: "https://buddybox.buddytools.org",
     });
+  });
+
+  test("does not require stale static Juicebox material", () => {
+    expect(() => readConfig(env)).not.toThrow();
+    expect(readConfig(env)).not.toHaveProperty("realmTokens");
+    expect(readConfig(env)).not.toHaveProperty("juiceboxConfig");
+    expect(readConfig(env)).not.toHaveProperty("botKeyVersion");
   });
 
   test("rejects malformed encryption material and insecure remote URLs", () => {

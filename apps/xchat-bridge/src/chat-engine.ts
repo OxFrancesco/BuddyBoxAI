@@ -22,15 +22,34 @@ interface StoredConversationKeys {
   keys: Record<string, string>;
 }
 
+type XChatSession = Pick<ChatWithJuicebox,
+  | "decryptEvent"
+  | "decryptEvents"
+  | "encryptMessage"
+  | "free"
+  | "lock"
+  | "matchesRegisteredKey"
+  | "setCacheKeys"
+  | "setIdentity"
+  | "setRejectUnverified"
+  | "setSigningKeys"
+  | "unlock"
+  | "verifyKeyBinding"
+>;
+
+export type XChatFactory = (
+  options: Parameters<typeof createChat>[0],
+) => Promise<XChatSession>;
+
 export class XChatEngine {
-  readonly #chat: ChatWithJuicebox;
+  readonly #chat: XChatSession;
   readonly #api: XApiClient;
   readonly #vault: SecureVault;
   readonly #botUserId: string;
   readonly #keyVersion: string;
 
   private constructor(options: {
-    chat: ChatWithJuicebox;
+    chat: XChatSession;
     api: XApiClient;
     vault: SecureVault;
     botUserId: string;
@@ -44,27 +63,43 @@ export class XChatEngine {
   }
 
   static async create(options: {
-    juiceboxConfig: string;
     juiceboxPin: string;
-    realmTokens: Readonly<Record<string, string>>;
     botUserId: string;
-    keyVersion: string;
     api: XApiClient;
     vault: SecureVault;
+    chatFactory?: XChatFactory;
   }): Promise<XChatEngine> {
-    const chat = await createChat({
-      juiceboxConfig: options.juiceboxConfig,
+    const material = await options.api.getXChatRecoveryMaterial(options.botUserId);
+    const chatFactory = options.chatFactory ?? createChat;
+    const chat = await chatFactory({
+      juiceboxConfig: material.juiceboxConfig,
       getAuthToken: async (realmId) => {
-        const token = options.realmTokens[realmId.toLowerCase()];
-        if (!token) throw new Error("No auth token configured for the requested Juicebox realm");
+        const token = material.realmTokens[realmId.toLowerCase()];
+        if (!token) throw new Error("No fresh auth token is available for the requested Juicebox realm");
         return token;
       },
     });
-    await chat.unlock(options.juiceboxPin);
-    chat.setIdentity(options.botUserId, options.keyVersion);
-    chat.setRejectUnverified(true);
-    chat.setCacheKeys(true);
-    return new XChatEngine({ chat, api: options.api, vault: options.vault, botUserId: options.botUserId, keyVersion: options.keyVersion });
+    try {
+      await chat.unlock(options.juiceboxPin);
+      const registeredKey = material.registeredKeys.find((record) =>
+        chat.matchesRegisteredKey(record.identityPublicKey)
+      );
+      if (!registeredKey) throw new Error("Recovered X Chat identity is not registered to this account");
+      chat.setIdentity(options.botUserId, registeredKey.publicKeyVersion);
+      chat.setRejectUnverified(true);
+      chat.setCacheKeys(true);
+      return new XChatEngine({
+        chat,
+        api: options.api,
+        vault: options.vault,
+        botUserId: options.botUserId,
+        keyVersion: registeredKey.publicKeyVersion,
+      });
+    } catch (error: unknown) {
+      chat.lock();
+      chat.free();
+      throw error;
+    }
   }
 
   async decryptLive(input: unknown): Promise<VerifiedInboundText | undefined> {

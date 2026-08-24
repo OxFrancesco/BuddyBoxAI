@@ -114,7 +114,7 @@
       "name": "@buddybox/xchat-bridge",
       "version": "0.1.0",
       "dependencies": {
-        "@xdevplatform/chat-xdk": "0.4.3",
+        "@xdevplatform/chat-xdk": "0.5.0",
         "juicebox-sdk": "0.3.0",
         "zod": "4.4.3",
       },
@@ -293,6 +293,34 @@
 
     "@babel/types": ["@babel/types@7.29.8", "", { "dependencies": { "@babel/helper-string-parser": "^7.29.7", "@babel/helper-validator-identifier": "^7.29.7" } }, "sha512-Vj1jF3cPfxg7OAfoI7QnVKLoILlm2JF9pnVHrX8qx7AHMiYWT+NDAA7jChlNgRS4WTLc/fD1lXLmPixluj+3Gg=="],
 
+    "@buddybox/agent-gateway": ["@buddybox/agent-gateway@workspace:apps/agent-gateway"],
+
+    "@buddybox/agent-gateway-runner": ["@buddybox/agent-gateway-runner@workspace:apps/agent-gateway/runner"],
+
+    "@buddybox/codex-connection": ["@buddybox/codex-connection@workspace:packages/codex-connection"],
+
+    "@buddybox/contracts": ["@buddybox/contracts@workspace:packages/contracts"],
+
+    "@buddybox/control-plane": ["@buddybox/control-plane@workspace:apps/control-plane"],
+
+    "@buddybox/credential-broker": ["@buddybox/credential-broker@workspace:apps/credential-broker"],
+
+    "@buddybox/portal": ["@buddybox/portal@workspace:apps/portal"],
+
+    "@buddybox/prototype-pi-runner": ["@buddybox/prototype-pi-runner@workspace:prototypes/pi-sandbox-runtime/runner"],
+
+    "@buddybox/prototype-pi-sandbox-runtime": ["@buddybox/prototype-pi-sandbox-runtime@workspace:prototypes/pi-sandbox-runtime"],
+
+    "@buddybox/provisioning": ["@buddybox/provisioning@workspace:packages/provisioning"],
+
+    "@buddybox/site-host": ["@buddybox/site-host@workspace:apps/site-host"],
+
+    "@buddybox/spectrum-bridge": ["@buddybox/spectrum-bridge@workspace:apps/spectrum-bridge"],
+
+    "@buddybox/starter-tanstack-clerk-convex": ["@buddybox/starter-tanstack-clerk-convex@workspace:starters/tanstack-clerk-convex"],
+
+    "@buddybox/xchat-bridge": ["@buddybox/xchat-bridge@workspace:apps/xchat-bridge"],
+
     "@bufbuild/protobuf": ["@bufbuild/protobuf@2.14.0", "", {}, "sha512-C3UGsiCwSprE2NKIIFA3hCDlpXTMCAXRZuEVp88L1GY36Y41+rYL5fryE+nOFhp4p4JPQvdV8PQ4DWgHgeTE+w=="],
 
     "@clerk/backend": ["@clerk/backend@3.16.4", "", { "dependencies": { "@clerk/shared": "^4.28.1", "standardwebhooks": "^1.0.0", "tslib": "2.8.1" } }, "sha512-7A9YlBLesYgKFn4DcaCq64Ggezmbzx+xYdWsiQLrMQV+U4Bm9LtDdyaNirQ0SStSsZy6PzL8RHw5zMmmEt0zMA=="],
@@ -400,34 +428,6 @@
     "@grpc/grpc-js": ["@grpc/grpc-js@1.14.4", "", { "dependencies": { "@grpc/proto-loader": "^0.8.0", "@js-sdsl/ordered-map": "^4.4.2" } }, "sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ=="],
 
     "@grpc/proto-loader": ["@grpc/proto-loader@0.8.1", "", { "dependencies": { "lodash.camelcase": "^4.3.0", "long": "^5.0.0", "protobufjs": "^7.5.5", "yargs": "^17.7.2" }, "bin": { "proto-loader-gen-types": "build/bin/proto-loader-gen-types.js" } }, "sha512-wtF6h+DY6M3YaDBPAmvuuA6jV8Sif9MjtOI5euKFWRgCDl5PeDpPsHR9u2l6St5ceY8AZgoNDww5+HvEsXFsGg=="],
-
-    "@buddybox/agent-gateway": ["@buddybox/agent-gateway@workspace:apps/agent-gateway"],
-
-    "@buddybox/agent-gateway-runner": ["@buddybox/agent-gateway-runner@workspace:apps/agent-gateway/runner"],
-
-    "@buddybox/codex-connection": ["@buddybox/codex-connection@workspace:packages/codex-connection"],
-
-    "@buddybox/contracts": ["@buddybox/contracts@workspace:packages/contracts"],
-
-    "@buddybox/control-plane": ["@buddybox/control-plane@workspace:apps/control-plane"],
-
-    "@buddybox/credential-broker": ["@buddybox/credential-broker@workspace:apps/credential-broker"],
-
-    "@buddybox/portal": ["@buddybox/portal@workspace:apps/portal"],
-
-    "@buddybox/prototype-pi-runner": ["@buddybox/prototype-pi-runner@workspace:prototypes/pi-sandbox-runtime/runner"],
-
-    "@buddybox/prototype-pi-sandbox-runtime": ["@buddybox/prototype-pi-sandbox-runtime@workspace:prototypes/pi-sandbox-runtime"],
-
-    "@buddybox/provisioning": ["@buddybox/provisioning@workspace:packages/provisioning"],
-
-    "@buddybox/site-host": ["@buddybox/site-host@workspace:apps/site-host"],
-
-    "@buddybox/spectrum-bridge": ["@buddybox/spectrum-bridge@workspace:apps/spectrum-bridge"],
-
-    "@buddybox/starter-tanstack-clerk-convex": ["@buddybox/starter-tanstack-clerk-convex@workspace:starters/tanstack-clerk-convex"],
-
-    "@buddybox/xchat-bridge": ["@buddybox/xchat-bridge@workspace:apps/xchat-bridge"],
 
     "@img/colour": ["@img/colour@1.1.0", "", {}, "sha512-Td76q7j57o/tLVdgS746cYARfSyxk8iEfRxewL9h4OMzYhbW4TAcppl0mT4eyqXddh6L/jwoM75mo7ixa/pCeQ=="],
 
@@ -825,7 +825,7 @@
 
     "@vitest/utils": ["@vitest/utils@3.2.7", "", { "dependencies": { "@vitest/pretty-format": "3.2.7", "loupe": "^3.1.4", "tinyrainbow": "^2.0.0" } }, "sha512-x6BDOd7dyo3PFLY3I9/HJ25X/6OurhGXk2/B9gOZNPF7XDVjeBK4k01lQE5uvDpbuheErh91qYuE1E2OEjK3Rw=="],
 
-    "@xdevplatform/chat-xdk": ["@xdevplatform/chat-xdk@0.4.3", "", { "peerDependencies": { "juicebox-sdk": "^0.3.0" }, "optionalPeers": ["juicebox-sdk"] }, "sha512-OoR2RRJlCfrOp/iOrLotcQwgxVuahc9lQIFLx5Odgq3EwdNik7KvNeDl5sE05C2k/5FAwM/iYxOSMJEsEelasQ=="],
+    "@xdevplatform/chat-xdk": ["@xdevplatform/chat-xdk@0.5.0", "", { "peerDependencies": { "juicebox-sdk": "^0.3.0" }, "optionalPeers": ["juicebox-sdk"] }, "sha512-ywcg/OTwZlAAzbmOOJWBnRGj/ABguHmrSF0tJ7XSruAn+tHEBwzRNyGwrjj+7p+CSFJGow/U6uHMPho/b+jAIQ=="],
 
     "abort-controller-x": ["abort-controller-x@0.5.0", "", {}, "sha512-yTt9CI0x+nRfX6BFMenEGP8ooPvErGH6AbFz20C2IeOLIlDsrw/VHpgne3GsCEuTA410IiFiaLVFKmgM4bKEPQ=="],
 

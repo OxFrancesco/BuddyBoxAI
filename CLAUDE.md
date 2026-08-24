@@ -15,5 +15,7 @@ folder to gather information, feedback, patterns, and templates before writing c
 - `resources/flue` — Official Flue framework — runtime, channel/database/sandbox connectors, blueprints, tooling, and examples
 - `resources/flue-codex` — Francesco's FLUE provider bridge for using each user's Codex subscription through Pi's native OpenAI Codex transport
 - `resources/cloudflare-sandbox-sdk` — Official Cloudflare Sandbox SDK source, current API types, lifecycle, tunnels, and examples for BuddyBox runtime proof
+- `resources/xurl` — Official X CLI with OAuth and X Chat key restore flows
+- `resources/x-chat-xdk` — Official X Chat encryption SDK including native Juicebox implementation
 
 <!-- codeview:end -->
