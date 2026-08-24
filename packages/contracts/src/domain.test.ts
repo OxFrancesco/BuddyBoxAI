@@ -6,6 +6,7 @@ import {
   runSchema,
   type IMessageConnection,
   type ServiceConnection,
+  type XChatConnection,
 } from "./domain";
 
 const now = "2026-08-13T12:00:00.000Z";
@@ -35,12 +36,22 @@ function connection(provider: ServiceConnection["provider"], status: ServiceConn
   } satisfies ServiceConnection;
 }
 
+const xChatConnection: XChatConnection = {
+  id: "xchat_01J1",
+  userId: "user_01J1",
+  accountIdHash: "0123456789abcdef",
+  status: "verified",
+  verifiedAt: now,
+  createdAt: now,
+  updatedAt: now,
+};
+
 describe("Project-ready User seam", () => {
-  test("requires verified iMessage, ChatGPT, GitHub, Cloudflare, and Convex authority", () => {
+  test("requires verified messaging, ChatGPT, GitHub, and Convex authority", () => {
     const readiness = evaluateProjectReadiness({
       userId: "user_01J1",
       iMessageConnections: [iMessageConnection],
-      serviceConnections: [connection("chatgpt"), connection("github"), connection("cloudflare"), connection("convex")],
+      serviceConnections: [connection("chatgpt"), connection("github"), connection("convex")],
     });
 
     expect(readiness).toEqual({ ready: true, missing: [] });
@@ -55,8 +66,19 @@ describe("Project-ready User seam", () => {
 
     expect(readiness).toEqual({
       ready: false,
-      missing: ["verified-imessage", "github", "cloudflare", "convex"],
+      missing: ["verified-messaging", "github", "convex"],
     });
+  });
+
+  test("accepts verified X Chat as the messaging channel", () => {
+    const readiness = evaluateProjectReadiness({
+      userId: "user_01J1",
+      iMessageConnections: [],
+      xChatConnections: [xChatConnection],
+      serviceConnections: [connection("chatgpt"), connection("github"), connection("convex")],
+    });
+
+    expect(readiness).toEqual({ ready: true, missing: [] });
   });
 });
 

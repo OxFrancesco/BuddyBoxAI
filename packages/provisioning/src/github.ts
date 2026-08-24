@@ -30,6 +30,12 @@ export function githubInstallationUrl(appSlug: string, state: string) {
 }
 
 type InstallationToken = { token: string; expiresAt: string };
+type RefreshedUserAccessToken = {
+  accessToken: string;
+  accessTokenExpiresAt: number;
+  refreshToken: string;
+  refreshTokenExpiresAt: number;
+};
 type GitHubRepository = { id: number; fullName: string; htmlUrl: string; defaultBranch: string };
 type Fetcher = (input: string | URL | Request, init?: RequestInit) => Promise<Response>;
 
@@ -76,13 +82,19 @@ export class GitHubAppProvisioner {
 
   async createInstallationToken(
     installationId: number,
-    scope: { repositoryIds?: number[] } = {},
+    scope: {
+      repositoryIds?: number[];
+      permissions?: { administration?: "read" | "write"; contents?: "read" | "write"; metadata?: "read" };
+    } = {},
   ): Promise<InstallationToken> {
     if (!Number.isSafeInteger(installationId) || installationId <= 0) throw new GitHubProvisioningError("invalid-input", "invalid installation id");
+    if (scope.repositoryIds?.some((id) => !Number.isSafeInteger(id) || id <= 0)) {
+      throw new GitHubProvisioningError("invalid-input", "invalid repository id");
+    }
     const jwt = createGitHubAppJwt(this.options);
     const body = {
       ...(scope.repositoryIds?.length ? { repository_ids: scope.repositoryIds } : {}),
-      permissions: { administration: "write", contents: "write", metadata: "read" },
+      permissions: scope.permissions ?? { administration: "write", contents: "write", metadata: "read" },
     };
     const result = await this.request<{ token?: string; expires_at?: string }>(
       `/app/installations/${installationId}/access_tokens`,
@@ -91,6 +103,50 @@ export class GitHubAppProvisioner {
     );
     if (!result.token || !result.expires_at) throw new GitHubProvisioningError("upstream", "GitHub returned an invalid installation token");
     return { token: result.token, expiresAt: result.expires_at };
+  }
+
+  async refreshUserAccessToken(input: {
+    clientId: string;
+    clientSecret: string;
+    refreshToken: string;
+    now?: number;
+  }): Promise<RefreshedUserAccessToken> {
+    if (!input.clientId || !input.clientSecret || !input.refreshToken.startsWith("ghr_")) {
+      throw new GitHubProvisioningError("invalid-input", "invalid GitHub refresh request");
+    }
+    const body = new URLSearchParams({
+      client_id: input.clientId,
+      client_secret: input.clientSecret,
+      grant_type: "refresh_token",
+      refresh_token: input.refreshToken,
+    });
+    const response = await this.fetcher("https://github.com/login/oauth/access_token", {
+      method: "POST",
+      headers: {
+        accept: "application/json",
+        "content-type": "application/x-www-form-urlencoded",
+        "user-agent": "BuddyBox/0.1",
+      },
+      body,
+      redirect: "manual",
+    });
+    const result = await response.json() as Record<string, unknown>;
+    if (
+      !response.ok ||
+      typeof result.access_token !== "string" || !result.access_token.startsWith("ghu_") ||
+      typeof result.refresh_token !== "string" || !result.refresh_token.startsWith("ghr_") ||
+      typeof result.expires_in !== "number" || !Number.isFinite(result.expires_in) ||
+      typeof result.refresh_token_expires_in !== "number" || !Number.isFinite(result.refresh_token_expires_in)
+    ) {
+      throw new GitHubProvisioningError(response.status === 401 ? "unauthorized" : "upstream", "GitHub returned an invalid refreshed credential");
+    }
+    const now = input.now ?? Date.now();
+    return {
+      accessToken: result.access_token,
+      accessTokenExpiresAt: now + result.expires_in * 1_000,
+      refreshToken: result.refresh_token,
+      refreshTokenExpiresAt: now + result.refresh_token_expires_in * 1_000,
+    };
   }
 
   async createOwnedRepository(input: {

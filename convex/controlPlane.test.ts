@@ -14,6 +14,7 @@ const modules = {
   "./conversations.ts": () => import("./conversations"),
   "./deletions.ts": () => import("./deletions"),
   "./maintenance.ts": () => import("./maintenance"),
+  "./orchestrator.ts": () => import("./orchestrator"),
   "./projects.ts": () => import("./projects"),
   "./releases.ts": () => import("./releases"),
   "./runEvents.ts": () => import("./runEvents"),
@@ -26,7 +27,7 @@ const modules = {
 function identity(subject: string) {
   return {
     subject,
-    tokenIdentifier: `https://issuer.ichef.test|${subject}`,
+    tokenIdentifier: `https://issuer.buddybox.test|${subject}`,
   };
 }
 
@@ -47,12 +48,31 @@ async function readyUserFixture(t: ReturnType<typeof convexTest>, subject: strin
       updatedAt: now,
     }),
   );
-  for (const provider of ["chatgpt", "github", "cloudflare", "convex"] as const) {
+  for (const provider of ["chatgpt", "github", "convex"] as const) {
+    const externalAccountIdHash = `${provider}-account-${subject}`;
+    const credentialId = provider === "chatgpt" ? undefined : await t.run((ctx) =>
+      ctx.db.insert("providerCredentials", {
+        ownerId: user._id,
+        provider,
+        accessTokenCiphertext: `encrypted-${provider}-${subject}`,
+        tokenType: "bearer",
+        scopes: [],
+        externalAccountIdHash,
+        expiresAt: now + 60_000,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
     await t.mutation(internal.connections.setServiceConnection, {
       ownerId: user._id,
       provider,
       status: "connected",
       scopes: [],
+      ...(credentialId ? {
+        externalAccountIdHash,
+        credentialRef: String(credentialId),
+        expiresAt: now + 60_000,
+      } : {}),
     });
   }
   const projectId = await t.run(async (ctx) =>
@@ -64,7 +84,6 @@ async function readyUserFixture(t: ReturnType<typeof convexTest>, subject: strin
       githubRepositoryId: `repo-${subject}`,
       githubRepositoryFullName: `${subject}/project`,
       defaultBranch: "main",
-      cloudflareAccountRef: `cf-${subject}`,
       convexProjectRef: `convex-${subject}`,
       createdAt: now,
       updatedAt: now,
@@ -74,6 +93,287 @@ async function readyUserFixture(t: ReturnType<typeof convexTest>, subject: strin
 }
 
 describe("authenticated Convex control plane", () => {
+  test("atomically binds every Proposed Project to a pending confirmation Approval", async () => {
+    const t = convexTest(schema, modules);
+    const alice = await readyUserFixture(t, "proposal-alice");
+    const expiresAt = Date.now() + 60_000;
+    const { proposalId, approvalId } = await alice.authenticated.mutation(api.projects.propose, {
+      name: "Seasonal Field Notes",
+      brief: "A signed-in guide for saving seasonal ingredient notes.",
+      planJson: JSON.stringify({ version: 1 }),
+      payloadHash: "a".repeat(64),
+      expiresAt,
+    });
+    const [proposal, approvals] = await t.run((ctx) => Promise.all([
+      ctx.db.get(proposalId),
+      ctx.db.query("approvals")
+        .withIndex("by_owner_id_and_binding_hash", (q) =>
+          q.eq("ownerId", alice.user._id).eq("bindingHash", "a".repeat(64)),
+        )
+        .collect(),
+    ]));
+
+    expect(proposal?.status).toBe("awaiting_approval");
+    expect(approvals).toHaveLength(1);
+    expect(approvalId).toBe(approvals[0]!._id);
+    expect(approvals[0]).toMatchObject({
+      ownerId: alice.user._id,
+      operation: "confirm_project",
+      bindingHash: "a".repeat(64),
+      status: "pending",
+      expiresAt,
+    });
+
+    const retry = await alice.authenticated.mutation(api.projects.propose, {
+      name: "Seasonal Field Notes",
+      brief: "A signed-in guide for saving seasonal ingredient notes.",
+      planJson: JSON.stringify({ version: 1 }),
+      payloadHash: "a".repeat(64),
+      expiresAt,
+    });
+    expect(retry).toEqual({ proposalId, approvalId });
+    expect(await t.run((ctx) => ctx.db.query("proposedProjects")
+      .withIndex("by_owner_id_and_payload_hash", (q) =>
+        q.eq("ownerId", alice.user._id).eq("payloadHash", "a".repeat(64)),
+      )
+      .collect())).toHaveLength(1);
+    await expect(alice.authenticated.mutation(api.projects.propose, {
+      name: "Different project",
+      brief: "A different payload cannot borrow the same approval binding.",
+      planJson: JSON.stringify({ version: 1, changed: true }),
+      payloadHash: "a".repeat(64),
+      expiresAt,
+    })).rejects.toThrow("already bound to different content");
+
+    const confirmation = await alice.authenticated.mutation(api.projects.confirmProposal, {
+      approvalId: approvals[0]!._id,
+      bindingHash: "a".repeat(64),
+    });
+    expect(confirmation).toEqual({
+      proposalId,
+      approvalId: approvals[0]!._id,
+      scheduled: true,
+    });
+    expect((await t.run((ctx) => ctx.db.get(approvals[0]!._id)))?.status).toBe("consumed");
+    expect(await alice.authenticated.mutation(api.projects.confirmProposal, {
+      approvalId: approvals[0]!._id,
+      bindingHash: "a".repeat(64),
+    })).toEqual(confirmation);
+
+    const secondHash = "b".repeat(64);
+    const second = await alice.authenticated.mutation(api.projects.propose, {
+      name: "Kitchen Ledger",
+      brief: "A small shared ledger for recipes and prep notes.",
+      planJson: JSON.stringify({ version: 1 }),
+      payloadHash: secondHash,
+      expiresAt: Date.now() + 60_000,
+    });
+    const delivery = await t.mutation(internal.channels.recordDelivery, {
+      ownerId: alice.user._id,
+      imessageConnectionId: alice.connectionId,
+      direction: "inbound",
+      providerMessageId: "spectrum-confirm-project",
+      messageHash: "approval-message-hash",
+      status: "accepted",
+      occurredAt: Date.now(),
+    });
+    expect(await t.mutation(internal.orchestrator.confirmProposalForDelivery, {
+      ownerId: alice.user._id,
+      deliveryId: delivery.deliveryId,
+      approvalCode: secondHash.slice(0, 8).toUpperCase(),
+    })).toEqual({ matched: true, proposalId: second.proposalId, approvalId: second.approvalId });
+    expect((await t.run((ctx) => ctx.db.get(second.approvalId)))?.consumedByDeliveryId)
+      .toBe(delivery.deliveryId);
+  });
+
+  test("managed hosting assigns collision-safe hostnames and atomically activates a release", async () => {
+    const t = convexTest(schema, modules);
+    const alice = await readyUserFixture(t, "hosting-alice");
+    const bob = await readyUserFixture(t, "hosting-bob");
+    const backfilled = await t.mutation(internal.projects.backfillManagedHostnames, {
+      limit: 10,
+    });
+    expect(backfilled.updated).toBeGreaterThanOrEqual(2);
+    const [aliceProject, bobProject] = await t.run((ctx) =>
+      Promise.all([ctx.db.get(alice.projectId), ctx.db.get(bob.projectId)]),
+    );
+    expect(aliceProject?.hostingHostname).toEndWith("-buddybox-sites.buddytools.org");
+    expect(bobProject?.hostingHostname).toEndWith("-buddybox-sites.buddytools.org");
+    expect(aliceProject?.hostingHostname).not.toBe(bobProject?.hostingHostname);
+
+    const now = Date.now();
+    const commitSha = "a".repeat(40);
+    const artifactManifestDigest = "b".repeat(64);
+    const hostname = aliceProject?.hostingHostname ?? "";
+    const sourceRunId = await t.run((ctx) =>
+      ctx.db.insert("runs", {
+        ownerId: alice.user._id,
+        projectId: alice.projectId,
+        commandKey: "managed-hosting-release",
+        instructionHash: "managed-hosting-instruction",
+        status: "succeeded",
+        outcome: "succeeded",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const approvalId = await t.run((ctx) =>
+      ctx.db.insert("approvals", {
+        ownerId: alice.user._id,
+        projectId: alice.projectId,
+        runId: sourceRunId,
+        operation: "publish_release",
+        bindingHash: "managed-hosting-binding",
+        status: "consumed",
+        expiresAt: now + 60_000,
+        consumedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    const releaseId = await t.mutation(internal.releases.create, {
+      ownerId: alice.user._id,
+      projectId: alice.projectId,
+      sourceRunId,
+      approvalId,
+      bindingHash: "managed-hosting-binding",
+      commitSha,
+      deploymentHostname: hostname,
+      artifactManifestDigest,
+    });
+    expect(await t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_one",
+    })).toEqual({ status: "reserved" });
+    await expect(t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: bob.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_cross_project",
+    })).rejects.toThrow("does not match");
+    await expect(t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest: "c".repeat(64),
+      attemptId: "attempt_other_manifest",
+    })).rejects.toThrow("does not match");
+    const siblingRunId = await t.run((ctx) =>
+      ctx.db.insert("runs", {
+        ownerId: alice.user._id,
+        projectId: alice.projectId,
+        commandKey: "managed-hosting-sibling",
+        instructionHash: "managed-hosting-sibling-instruction",
+        status: "succeeded",
+        outcome: "succeeded",
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await expect(t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId: siblingRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_sibling_run",
+    })).rejects.toThrow("does not match");
+    await expect(t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_concurrent",
+    })).rejects.toThrow("already in progress");
+    expect(await t.mutation(internal.releases.failManagedDeploymentUpload, {
+      releaseId,
+      attemptId: "attempt_one",
+    })).toEqual({ status: "failed" });
+    expect(await t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_retry",
+    })).toEqual({ status: "reserved" });
+    const liveUrl = `https://${hostname}/`;
+    const activated = await t.mutation(internal.releases.activateManagedRelease, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_retry",
+      deploymentRef: "r2/releases/immutable-release-1",
+      liveUrl,
+    });
+    expect(activated).toEqual({
+      projectId: alice.projectId,
+      releaseId,
+      status: "live",
+    });
+    expect(await t.mutation(internal.releases.reserveManagedDeploymentUpload, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_after_live",
+    })).toEqual({
+      status: "live",
+      deploymentRef: "r2/releases/immutable-release-1",
+      liveUrl,
+    });
+    expect(await t.mutation(internal.releases.activateManagedRelease, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_retry",
+      deploymentRef: "r2/releases/immutable-release-1",
+      liveUrl,
+    })).toEqual(activated);
+    expect(await t.query(internal.releases.resolveManagedSite, {
+      hostname: aliceProject?.hostingHostname ?? "",
+    })).toEqual({
+      projectId: alice.projectId,
+      releaseId,
+      commitSha,
+      deploymentRef: "r2/releases/immutable-release-1",
+      status: "live",
+    });
+    await expect(t.mutation(internal.releases.activateManagedRelease, {
+      projectId: alice.projectId,
+      releaseId,
+      sourceRunId,
+      commitSha,
+      hostname,
+      artifactManifestDigest,
+      attemptId: "attempt_retry",
+      deploymentRef: "r2/releases/different",
+      liveUrl,
+    })).rejects.toThrow("different deployment data");
+  });
+
   test("owner isolation and one-active-Run admission hold across Users", async () => {
     const t = convexTest(schema, modules);
     const alice = await readyUserFixture(t, "alice");
@@ -261,9 +561,35 @@ describe("authenticated Convex control plane", () => {
         spectrum: "revoked",
       }),
     });
+    const now = Date.now();
+    const xchatConnectionId = await t.run((ctx) =>
+      ctx.db.insert("xchatConnections", {
+        ownerId: alice.user._id,
+        senderIdHash: "deletion-xchat-sender",
+        providerConversationIdHash: "deletion-xchat-conversation",
+        maskedSender: "X Chat •sender",
+        status: "verified",
+        verifiedAt: now,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
+    await t.run((ctx) =>
+      ctx.db.insert("xchatClaims", {
+        senderIdHash: "deletion-xchat-sender",
+        providerConversationIdHash: "deletion-xchat-conversation",
+        tokenHash: "deletion-xchat-token",
+        ownerId: alice.user._id,
+        connectionId: xchatConnectionId,
+        status: "verified",
+        expiresAt: now + 60_000,
+        createdAt: now,
+        updatedAt: now,
+      }),
+    );
 
     let result: { status: string; stage: string } = { status: "purging", stage: "approvals" };
-    for (let pass = 0; pass < 30 && result.status !== "complete"; pass += 1) {
+    for (let pass = 0; pass < 40 && result.status !== "complete"; pass += 1) {
       result = await t.mutation(internal.deletions.advance, { jobId });
     }
     expect(result).toMatchObject({ status: "complete", stage: "done" });
@@ -279,5 +605,15 @@ describe("authenticated Convex control plane", () => {
     expect(tombstone).toMatchObject({ status: "deleted" });
     expect(tombstone?.primaryEmail).toBeUndefined();
     expect(tombstone?.displayName).toBeUndefined();
+    expect(await t.run((ctx) =>
+      ctx.db.query("xchatConnections")
+        .withIndex("by_owner_id_and_created_at", (q) => q.eq("ownerId", alice.user._id))
+        .take(1),
+    )).toEqual([]);
+    expect(await t.run((ctx) =>
+      ctx.db.query("xchatClaims")
+        .withIndex("by_owner_id", (q) => q.eq("ownerId", alice.user._id))
+        .take(1),
+    )).toEqual([]);
   });
 });

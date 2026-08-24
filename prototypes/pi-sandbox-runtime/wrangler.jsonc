@@ -1,9 +1,10 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ichef-pi-sandbox-prototype",
+  "name": "buddybox-pi-sandbox-prototype",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-13",
   "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
   "observability": {
     "enabled": true
   },

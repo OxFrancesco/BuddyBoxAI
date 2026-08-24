@@ -8,7 +8,7 @@ All routes begin with:
 /v1/projects/:projectId/generations/:sandboxGeneration
 ```
 
-Every request carries trusted control-plane bearer authority. `projectId`, generation, Run IDs, and checkpoint IDs are routing identifiers—not proof of ownership. The gateway derives the Sandbox identity from the authenticated User plus the Project and generation.
+Every request carries trusted control-plane bearer authority. `projectId`, generation, Run IDs, and checkpoint IDs are routing identifiers—not proof of ownership. Every capability is bound to one Sandbox generation; Run operations are also bound to one Run ID. Artifact reads, screenshots, and deployments use separate actions. A deployment capability additionally binds the Release, source Run, commit, managed hostname, and canonical artifact-manifest digest. The gateway derives the Sandbox identity from the authenticated User plus the Project and generation.
 
 ## Lifecycle
 
@@ -21,6 +21,9 @@ Every request carries trusted control-plane bearer authority. `projectId`, gener
 7. `POST /checkpoints` archives repository state, Git history, and Pi sessions to the User/Project R2 namespace.
 8. `POST /replacement` restores a checkpoint into exactly the next generation and destroys the old Sandbox only after restore succeeds.
 9. `POST /teardown` destroys the current Sandbox and its ephemeral state.
+10. `POST /deployments` re-reads only the capability-bound artifact manifest,
+    verifies every digest, and hands the exact Release to the private managed
+    site host.
 
 ## Admission
 

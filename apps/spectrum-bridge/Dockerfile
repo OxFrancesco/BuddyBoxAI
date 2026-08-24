@@ -6,7 +6,7 @@ ENV NODE_ENV=production
 
 # Railway builds this Dockerfile with the repository root as its context.
 COPY . .
-RUN bun install --frozen-lockfile --production --filter @ichef/spectrum-bridge
+RUN bun install --frozen-lockfile --production --filter @buddybox/spectrum-bridge
 
 USER bun
 EXPOSE 3000

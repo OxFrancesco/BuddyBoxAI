@@ -1,6 +1,6 @@
-# iChef Spectrum bridge
+# BuddyBox Spectrum bridge
 
-The Spectrum bridge is iChef's persistent iMessage channel adapter. It verifies
+The Spectrum bridge is BuddyBox's persistent iMessage channel adapter. It verifies
 Photon Spectrum webhook deliveries or consumes Spectrum's authenticated gRPC
 stream, normalizes them into one bounded message contract, and admits each
 message through the trusted Convex control plane. It also delivers queued
@@ -19,8 +19,10 @@ return-message challenge below.
   timestamp window and optional webhook ID, bounds the body, then waits for
   durable Convex admission before returning `202`.
 - `POST /v1/outbound` — trusted Convex-to-bridge delivery. Requires
-  `Authorization: Bearer $ICHEF_BRIDGE_SECRET`; the JSON body is limited to 32
-  KiB and the text to 6,000 characters.
+  `Authorization: Bearer $BUDDYBOX_BRIDGE_SECRET`; the JSON body is limited to 32
+  KiB and the text to 6,000 characters. A delivery whose provider acceptance is
+  ambiguous returns `409` with `{"status":"reconciliation_required"}` and no
+  retry instruction.
 
 Webhook mode is the production default because Spectrum can retry a non-2xx
 response. `grpc` is available for environments that cannot register a webhook;
@@ -29,13 +31,13 @@ the second delivery.
 
 ## Clerk-bound iMessage connection flow
 
-1. An unbound address sends iChef a message. `accept_inbound` atomically records
+1. An unbound address sends BuddyBox a message. `accept_inbound` atomically records
    the provider message ID and creates an expiring, one-use claim URL bound to
    the keyed address hash. The returned outbound copy contains that URL.
 2. The User opens the URL and signs in with Clerk. The portal attaches the
    pending challenge to that Clerk User and displays a short code. The raw
    address is not identity proof.
-3. The User sends exactly `ICHEF-<code>` from the same iMessage address.
+3. The User sends exactly `BUDDYBOX-<code>` from the same iMessage address.
 4. The bridge calls `complete_challenge`; Convex verifies the code, expiry,
    one-use state, address hash, and Clerk owner in one transaction before it
    marks the iMessage Connection verified.
@@ -70,16 +72,25 @@ control-plane behavior:
   the Conversation/Run or returns an onboarding reply.
 - `complete_challenge` consumes an expiring challenge atomically. Hash and
   compare the received code server-side; never store it in plaintext.
-- `claim_outbound` leases an outbound delivery by its idempotency key. Return
-  `claimed`, `in_flight`, or `already_delivered`.
-- `settle_outbound` makes `delivered` terminal. `failed_retryable` remains
-  eligible for a later Convex-scheduled call to `/v1/outbound`.
+- `claim_outbound` leases an outbound delivery by its idempotency key. A
+  successful claim returns a fresh 256-bit opaque lease token; Convex stores
+  only its SHA-256 hash and a bounded expiry. An unexpired lease returns
+  `in_flight`. An expired `in_flight` lease becomes
+  `reconciliation_required`; it is never automatically reclaimed.
+- `settle_outbound` requires the token for the current lease. A stale worker
+  cannot settle after an operator requeues the delivery. A late settlement with
+  the exact retained lease can resolve `reconciliation_required`. `delivered`
+  is terminal and idempotent for the matching lease; a definitely failed send
+  that successfully settles `failed_retryable` remains eligible for a later
+  Convex-scheduled call to `/v1/outbound`.
 
 If Spectrum accepts a send but Convex settlement is temporarily unavailable,
 the bridge returns `settlement_pending` and does not send the provider message
-again. Keep the outbound lease in-flight and reconcile that ambiguous record;
-expiring the lease into an automatic resend can duplicate a message because
-Spectrum does not expose a send idempotency key.
+again. When its lease expires, Convex durably blocks the delivery in
+`reconciliation_required`. An operator-only internal reconciliation mutation
+must then either mark verified provider acceptance delivered or deliberately
+requeue it. Automatically resending after lease expiry can duplicate a message
+because Spectrum does not expose a send idempotency key.
 
 The broker is intentionally a small typed seam. It prevents the bridge from
 learning Convex table layout or receiving a Clerk session, while Convex retains
@@ -108,7 +119,7 @@ disabled and its SDK logger is set to `silent`; enable external telemetry only
 after auditing its redaction policy.
 
 The normalized address is HMAC-SHA256 pseudonymized with
-`ICHEF_ADDRESS_PEPPER`. Rotate that key only with a migration plan because it is
+`BUDDYBOX_ADDRESS_PEPPER`. Rotate that key only with a migration plan because it is
 part of the connection lookup identity. Spectrum `spaceId` and `lineId` remain
 sensitive provider routing references (a DM space ID may embed an address), so
 the control plane must encrypt them at rest and must never place them in logs.
@@ -126,8 +137,8 @@ secret returned at webhook creation. The production image and Railway service
 use the repository root as build context:
 
 ```sh
-docker build -f apps/spectrum-bridge/Dockerfile -t ichef-spectrum-bridge .
-docker run --env-file apps/spectrum-bridge/.env.local -p 3000:3000 ichef-spectrum-bridge
+docker build -f apps/spectrum-bridge/Dockerfile -t buddybox-spectrum-bridge .
+docker run --env-file apps/spectrum-bridge/.env.local -p 3000:3000 buddybox-spectrum-bridge
 ```
 
 Official protocol references:

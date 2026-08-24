@@ -8,14 +8,14 @@ export const Route = createFileRoute("/sign-in/$")({ component: SignInPage });
 function SignInPage() {
   return (
     <main className="auth-page">
-      <a className="brand" href="/" aria-label="iChef home">
+      <a className="brand" href="/" aria-label="BuddyBox home">
         <BrandMark />
-        <span>iChef</span>
+        <span>BuddyBox</span>
       </a>
       <div className="auth-card">
-        <p className="eyebrow">Your kitchen, securely yours</p>
+        <p className="eyebrow">Google sign-in · secured by Clerk</p>
         <h1>Sign in to keep cooking.</h1>
-        <p>Every iMessage command, repository, preview, and release stays bound to your identity.</p>
+        <p>Continue with Google. GitHub is connected separately later, only for repositories and code.</p>
         <SignIn routing="path" path="/sign-in" signUpUrl="/sign-up" />
       </div>
     </main>

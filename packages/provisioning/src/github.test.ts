@@ -6,6 +6,7 @@ import {
   createGitHubAppJwt,
   githubInstallationUrl,
 } from "./github";
+import { resolveGitHubEgressRoute } from "./github-egress";
 
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
@@ -47,7 +48,7 @@ describe("GitHub App provisioning", () => {
       owner: { kind: "user", login: "chef" },
       userAccessToken: "ghu_ephemeral",
       name: "first-dish",
-      description: "Created by iChef",
+      description: "Created by BuddyBox",
       visibility: "private",
     });
 
@@ -107,8 +108,99 @@ describe("GitHub App provisioning", () => {
   });
 
   test("builds the least-privilege installation URL", () => {
-    expect(githubInstallationUrl("ichef-agent", "state-token")).toBe(
-      "https://github.com/apps/ichef-agent/installations/new?state=state-token",
+    expect(githubInstallationUrl("buddybox-agent", "state-token")).toBe(
+      "https://github.com/apps/buddybox-agent/installations/new?state=state-token",
     );
+  });
+
+  test("refreshes an expiring user token without exposing the refresh credential", async () => {
+    const requests: Array<{ url: string; body: URLSearchParams }> = [];
+    const github = new GitHubAppProvisioner({
+      appId: "1234",
+      privateKeyPem: pem,
+      fetcher: async (input, init) => {
+        requests.push({ url: String(input), body: new URLSearchParams(String(init?.body)) });
+        return Response.json({
+          access_token: "ghu_replacement",
+          expires_in: 28_800,
+          refresh_token: "ghr_replacement",
+          refresh_token_expires_in: 15_897_600,
+          token_type: "bearer",
+        });
+      },
+    });
+
+    const result = await github.refreshUserAccessToken({
+      clientId: "Iv1.client",
+      clientSecret: "client-secret",
+      refreshToken: "ghr_current",
+      now: 1_800_000_000_000,
+    });
+
+    expect(result).toEqual({
+      accessToken: "ghu_replacement",
+      accessTokenExpiresAt: 1_800_028_800_000,
+      refreshToken: "ghr_replacement",
+      refreshTokenExpiresAt: 1_815_897_600_000,
+    });
+    expect(requests[0]?.url).toBe("https://github.com/login/oauth/access_token");
+    expect(requests[0]?.body.get("grant_type")).toBe("refresh_token");
+    expect(JSON.stringify(result)).not.toContain("current");
+  });
+});
+
+describe("GitHub repository egress policy", () => {
+  test("maps Git smart HTTP only for the project-bound repository", () => {
+    expect(resolveGitHubEgressRoute({
+      method: "GET",
+      pathname: "/octocat/menu.git/info/refs",
+      search: "?service=git-upload-pack",
+      repositoryFullName: "octocat/menu",
+    })).toEqual({
+      kind: "git",
+      upstreamUrl: "https://github.com/octocat/menu.git/info/refs?service=git-upload-pack",
+    });
+    expect(resolveGitHubEgressRoute({
+      method: "POST",
+      pathname: "/octocat/another.git/git-receive-pack",
+      search: "",
+      repositoryFullName: "octocat/menu",
+    })).toBeNull();
+  });
+
+  test("allows repository content APIs but rejects administrative and cross-repository APIs", () => {
+    expect(resolveGitHubEgressRoute({
+      method: "PUT",
+      pathname: "/api/repos/octocat/menu/contents/src/app.ts",
+      search: "",
+      repositoryFullName: "octocat/menu",
+    })?.upstreamUrl).toBe("https://api.github.com/repos/octocat/menu/contents/src/app.ts");
+    expect(resolveGitHubEgressRoute({
+      method: "DELETE",
+      pathname: "/api/repos/octocat/menu",
+      search: "",
+      repositoryFullName: "octocat/menu",
+    })).toBeNull();
+    expect(resolveGitHubEgressRoute({
+      method: "GET",
+      pathname: "/api/repos/octocat/private-repo/contents/package.json",
+      search: "",
+      repositoryFullName: "octocat/menu",
+    })).toBeNull();
+  });
+
+  test("rejects encoded separators and unexpected query parameters", () => {
+    expect(resolveGitHubEgressRoute({
+      method: "GET",
+      pathname: "/octocat%2fmenu.git/info/refs",
+      search: "?service=git-upload-pack",
+      repositoryFullName: "octocat/menu",
+    })).toBeNull();
+    expect(resolveGitHubEgressRoute({
+      method: "GET",
+      pathname: "/octocat/menu.git/info/refs",
+      search: "?service=git-upload-pack&redirect=https://evil.example",
+      repositoryFullName: "octocat/menu",
+    })).toBeNull();
   });
 });

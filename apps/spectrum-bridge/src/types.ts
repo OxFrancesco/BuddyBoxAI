@@ -50,19 +50,22 @@ export interface ChallengeAttempt {
 }
 
 export type OutboundClaim =
-  | { status: "claimed" }
+  | { status: "claimed"; leaseToken: string }
   | { status: "already_delivered" }
-  | { status: "in_flight" };
+  | { status: "in_flight" }
+  | { status: "reconciliation_required" };
 
 export type OutboundSettlement =
   | {
       outboundId: string;
+      leaseToken: string;
       status: "delivered";
       attempts: number;
       providerMessageId: string;
     }
   | {
       outboundId: string;
+      leaseToken: string;
       status: "failed_retryable";
       attempts: number;
       errorCode: "spectrum_unavailable";

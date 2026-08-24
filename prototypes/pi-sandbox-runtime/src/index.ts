@@ -1,9 +1,11 @@
 import { getSandbox, type Sandbox as SandboxClient } from "@cloudflare/sandbox";
+import { withLifecycleAuthorization } from "./lifecycle-auth";
 
 export { Sandbox } from "@cloudflare/sandbox";
 
 interface Env {
   Sandbox: DurableObjectNamespace<SandboxClient>;
+  BUDDYBOX_PROTOTYPE_SECRET?: string;
 }
 
 const runnerPort = 8790;
@@ -16,7 +18,7 @@ function sandboxFor(env: Env, id: string) {
     enableDefaultSession: false,
     sleepAfter: "12s",
     normalizeId: true,
-    labels: { workload: "ichef-pi-prototype" },
+    labels: { workload: "buddybox-pi-prototype" },
   });
 }
 
@@ -31,7 +33,7 @@ async function ensureRunner(sandbox: ReturnType<typeof sandboxFor>) {
   const existing = (await sandbox.listProcesses()).find((process) => process.id === "pi-runtime");
   if (existing?.status === "running" || existing?.status === "starting") return existing;
 
-  const process = await sandbox.startProcess("bun /opt/ichef-pi-prototype/src/server.ts", {
+  const process = await sandbox.startProcess("bun /opt/buddybox-pi-prototype/src/server.ts", {
     processId: "pi-runtime",
     cwd: "/workspace",
   });
@@ -56,7 +58,7 @@ async function proxyRunner(request: Request, sandbox: ReturnType<typeof sandboxF
 const seedFiles: Record<string, string> = {
   "/workspace/package.json": JSON.stringify(
     {
-      name: "ichef-pi-prototype-site",
+      name: "buddybox-pi-prototype-site",
       private: true,
       type: "module",
       scripts: {
@@ -71,7 +73,7 @@ const seedFiles: Record<string, string> = {
   "/workspace/src/site-server.ts": [
     'import { headline } from "./generated";',
     "",
-    'const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>iChef Pi probe</title><style>body{font-family:system-ui;background:#171412;color:#fff7ed;display:grid;place-items:center;min-height:100vh;margin:0}main{max-width:42rem;padding:3rem;border:1px solid #6b5547;border-radius:1.5rem;background:#211b17}small{color:#f59e0b;text-transform:uppercase;letter-spacing:.18em}</style></head><body><main><small>Cloudflare Sandbox + Pi</small><h1>${headline}</h1><p>This page was produced by the real Pi coding loop using a deterministic credential-free model.</p></main></body></html>`;',
+    'const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><title>BuddyBox Pi probe</title><style>body{font-family:system-ui;background:#171412;color:#fff7ed;display:grid;place-items:center;min-height:100vh;margin:0}main{max-width:42rem;padding:3rem;border:1px solid #6b5547;border-radius:1.5rem;background:#211b17}small{color:#f59e0b;text-transform:uppercase;letter-spacing:.18em}</style></head><body><main><small>Cloudflare Sandbox + Pi</small><h1>${headline}</h1><p>This page was produced by the real Pi coding loop using a deterministic credential-free model.</p></main></body></html>`;',
     "",
     'Bun.serve({ hostname: "0.0.0.0", port: 4173, fetch: () => new Response(html, { headers: { "content-type": "text/html" } }) });',
     'console.log("preview ready on 4173");',
@@ -81,7 +83,7 @@ const seedFiles: Record<string, string> = {
 import { headline } from "./generated";
 
 test("Pi generated the expected headline", () => {
-  expect(headline).toBe("Dinner is served by iChef");
+  expect(headline).toBe("Dinner is served by BuddyBox");
 });
 `,
   "/workspace/AGENTS.md": `# PROTOTYPE workspace
@@ -95,13 +97,13 @@ async function seed(sandbox: ReturnType<typeof sandboxFor>) {
   await sandbox.mkdir("/workspace/src", { recursive: true });
   for (const [path, content] of Object.entries(seedFiles)) await sandbox.writeFile(path, content);
   const git = await sandbox.exec(
-    'git init && git config user.email "prototype@ichef.local" && git config user.name "iChef Prototype" && git add . && git commit -m "Initial prototype"',
+    'git init && git config user.email "prototype@buddybox.local" && git config user.name "BuddyBox Prototype" && git add . && git commit -m "Initial prototype"',
     { timeout: 20_000 },
   );
   if (!git.success) throw new Error(`git seed failed: ${git.stderr}`);
   await ensureRunner(sandbox);
   const runtime = await sandbox.exec(
-    "bun --version && node --version && git --version && du -sb /opt/ichef-pi-prototype",
+    "bun --version && node --version && git --version && du -sb /opt/buddybox-pi-prototype",
     { timeout: 20_000 },
   );
   if (!runtime.success) throw new Error(`runtime inspection failed: ${runtime.stderr}`);
@@ -125,7 +127,7 @@ async function inspectIdleRestart(sandbox: ReturnType<typeof sandboxFor>) {
   let generatedFileError: string | undefined;
   try {
     const generated = await sandbox.readFile("/workspace/src/generated.ts");
-    generatedFileSurvived = generated.content.includes("Dinner is served by iChef");
+    generatedFileSurvived = generated.content.includes("Dinner is served by BuddyBox");
   } catch (error) {
     generatedFileError = error instanceof Error ? error.message : String(error);
   }
@@ -164,13 +166,13 @@ async function startPreview(sandbox: ReturnType<typeof sandboxFor>) {
   } catch (error) {
     tunnelError = error instanceof Error ? error.message : String(error);
   }
-  return { internalStatus: internal.status, containsHeadline: html.includes("Dinner is served by iChef"), tunnelUrl, tunnelError };
+  return { internalStatus: internal.status, containsHeadline: html.includes("Dinner is served by BuddyBox"), tunnelUrl, tunnelError };
 }
 
 async function checkpointAndReplace(env: Env, id: string) {
   const startedAt = Date.now();
   const current = sandboxFor(env, id);
-  const archive = "/tmp/ichef-checkpoint.tgz";
+  const archive = "/tmp/buddybox-checkpoint.tgz";
   const packed = await current.exec(`tar -C /workspace -czf ${archive} .`, { timeout: 30_000 });
   if (!packed.success) throw new Error(`checkpoint failed: ${packed.stderr}`);
   const checkpoint = await current.readFile(archive, { encoding: "base64" });
@@ -193,7 +195,7 @@ async function checkpointAndReplace(env: Env, id: string) {
     recoveredSandboxId: recoveredId,
     checkpointBytes: checkpoint.size,
     elapsedMs: Date.now() - startedAt,
-    generatedFileRestored: generated.content.includes("Dinner is served by iChef"),
+    generatedFileRestored: generated.content.includes("Dinner is served by BuddyBox"),
     gitRepositoryRestored: git.success && git.stdout.startsWith("true"),
     gitStatus: git.stdout.trim().split("\n").slice(1),
     runnerHealth: await health.json(),
@@ -201,7 +203,7 @@ async function checkpointAndReplace(env: Env, id: string) {
 }
 
 export default {
-  async fetch(request: Request, env: Env): Promise<Response> {
+  fetch: withLifecycleAuthorization<Env>(async (request: Request, env: Env): Promise<Response> => {
     const url = new URL(request.url);
     const match = url.pathname.match(/^\/api\/sandboxes\/([^/]+)\/(setup|runs|preview|state|recover|destroy)(.*)$/);
     if (!match) return new Response("PROTOTYPE: use /api/sandboxes/:id/*", { status: 404 });
@@ -238,5 +240,5 @@ export default {
     } catch (error) {
       return jsonError(error);
     }
-  },
+  }),
 };

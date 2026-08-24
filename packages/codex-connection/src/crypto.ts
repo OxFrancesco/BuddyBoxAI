@@ -85,7 +85,7 @@ export class AesGcmSecretVault implements SecretVault {
 export async function hashAccountId(accountId: string): Promise<string> {
   const digest = await crypto.subtle.digest(
     "SHA-256",
-    encoder.encode(`ichef:chatgpt-account:v1:${accountId}`),
+    encoder.encode(`buddybox:chatgpt-account:v1:${accountId}`),
   );
   return encode(new Uint8Array(digest));
 }

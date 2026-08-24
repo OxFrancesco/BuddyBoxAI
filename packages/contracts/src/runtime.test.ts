@@ -30,7 +30,7 @@ describe("runtime command seam", () => {
         attachments: [],
       },
       workspace: {
-        branch: "ichef/run_01J1",
+        branch: "buddybox/run_01J1",
         baseCheckpoint: null,
       },
       limits: {

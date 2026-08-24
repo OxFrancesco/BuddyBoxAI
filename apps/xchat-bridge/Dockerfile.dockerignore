@@ -1,0 +1,6 @@
+.git
+.env*
+node_modules
+apps/*/node_modules
+resources
+.scratch

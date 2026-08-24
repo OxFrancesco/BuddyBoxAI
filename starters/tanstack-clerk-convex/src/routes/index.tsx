@@ -34,7 +34,7 @@ function HomePage() {
 
       <section className="mx-auto grid max-w-6xl gap-12 px-6 pb-24 pt-20 lg:grid-cols-[1.25fr_0.75fr] lg:items-center">
         <div>
-          <p className="eyebrow">iChef starter</p>
+          <p className="eyebrow">BuddyBox starter</p>
           <h1 className="mt-5 max-w-3xl text-5xl font-bold leading-[1.02] tracking-tight sm:text-7xl">
             A sharp foundation for your next idea.
           </h1>

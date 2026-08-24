@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@ichef/prototype-pi-sandbox-runtime",
+      "name": "@buddybox/prototype-pi-sandbox-runtime",
       "dependencies": {
         "@cloudflare/containers": "^0.3.5",
         "@cloudflare/sandbox": "0.12.6",

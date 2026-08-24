@@ -29,6 +29,7 @@ import type * as lib_providerCrypto from "../lib/providerCrypto.js";
 import type * as lib_readiness from "../lib/readiness.js";
 import type * as maintenance from "../maintenance.js";
 import type * as modelValidators from "../modelValidators.js";
+import type * as orchestrator from "../orchestrator.js";
 import type * as projects from "../projects.js";
 import type * as providerOAuth from "../providerOAuth.js";
 import type * as providerOAuthStore from "../providerOAuthStore.js";
@@ -38,6 +39,7 @@ import type * as runs from "../runs.js";
 import type * as runtime from "../runtime.js";
 import type * as usage from "../usage.js";
 import type * as users from "../users.js";
+import type * as xchat from "../xchat.js";
 
 import type {
   ApiFromModules,
@@ -67,6 +69,7 @@ declare const fullApi: ApiFromModules<{
   "lib/readiness": typeof lib_readiness;
   maintenance: typeof maintenance;
   modelValidators: typeof modelValidators;
+  orchestrator: typeof orchestrator;
   projects: typeof projects;
   providerOAuth: typeof providerOAuth;
   providerOAuthStore: typeof providerOAuthStore;
@@ -76,6 +79,7 @@ declare const fullApi: ApiFromModules<{
   runtime: typeof runtime;
   usage: typeof usage;
   users: typeof users;
+  xchat: typeof xchat;
 }>;
 
 /**

@@ -1,6 +1,6 @@
 FROM docker.io/cloudflare/sandbox:0.12.6
 
-WORKDIR /opt/ichef-agent-runner
+WORKDIR /opt/buddybox-agent-runner
 COPY runner/package.json ./package.json
 RUN bun install
 RUN bun x playwright install --with-deps chromium

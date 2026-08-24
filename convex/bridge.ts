@@ -5,6 +5,7 @@ import { DELIVERY_RETENTION_MS, requireBoundedString } from "./lib/bounds";
 import { writeAudit } from "./lib/audit";
 
 const CLAIM_TTL_MS = 15 * 60 * 1_000;
+const MAX_OUTBOUND_LEASE_TTL_MS = 5 * 60 * 1_000;
 
 const admissionResult = v.union(
   v.object({ status: v.literal("duplicate"), deliveryId: v.id("channelDeliveries") }),
@@ -279,17 +280,58 @@ export const consumeChallenge = internalMutation({
 });
 
 export const claimOutbound = internalMutation({
-  args: { outboundId: v.string(), idempotencyKey: v.string() },
-  returns: v.object({ status: v.union(v.literal("claimed"), v.literal("already_delivered"), v.literal("in_flight")) }),
+  args: {
+    outboundId: v.string(),
+    idempotencyKey: v.string(),
+    leaseIdHash: v.string(),
+    leaseExpiresAt: v.number(),
+  },
+  returns: v.object({
+    status: v.union(
+      v.literal("claimed"),
+      v.literal("already_delivered"),
+      v.literal("in_flight"),
+      v.literal("reconciliation_required"),
+    ),
+  }),
   handler: async (ctx, args) => {
+    const now = Date.now();
+    const leaseIdHash = requireLeaseIdHash(args.leaseIdHash);
+    if (
+      args.leaseExpiresAt <= now ||
+      args.leaseExpiresAt > now + MAX_OUTBOUND_LEASE_TTL_MS
+    ) {
+      throw new ConvexError({
+        code: "INVALID_LEASE_EXPIRY",
+        message: "Outbound lease expiry is invalid",
+      });
+    }
     const outbound = await ctx.db.query("outboundDeliveries")
       .withIndex("by_outbound_id", (q) => q.eq("outboundId", args.outboundId)).unique();
     if (!outbound || outbound.idempotencyKey !== args.idempotencyKey) {
       throw new ConvexError({ code: "OUTBOUND_NOT_FOUND", message: "Outbound delivery not found" });
     }
     if (outbound.status === "delivered") return { status: "already_delivered" as const };
-    if (outbound.status === "in_flight") return { status: "in_flight" as const };
-    await ctx.db.patch(outbound._id, { status: "in_flight", updatedAt: Date.now() });
+    if (outbound.status === "reconciliation_required") {
+      return { status: "reconciliation_required" as const };
+    }
+    if (outbound.status === "in_flight") {
+      if (outbound.leaseExpiresAt !== undefined && outbound.leaseExpiresAt > now) {
+        return { status: "in_flight" as const };
+      }
+      await ctx.db.patch(outbound._id, {
+        status: "reconciliation_required",
+        lastErrorCode: "provider_acceptance_unknown",
+        updatedAt: now,
+      });
+      return { status: "reconciliation_required" as const };
+    }
+    await ctx.db.patch(outbound._id, {
+      status: "in_flight",
+      leaseIdHash,
+      leaseExpiresAt: args.leaseExpiresAt,
+      updatedAt: now,
+    });
     return { status: "claimed" as const };
   },
 });
@@ -297,6 +339,7 @@ export const claimOutbound = internalMutation({
 export const settleOutbound = internalMutation({
   args: {
     outboundId: v.string(),
+    leaseIdHash: v.string(),
     status: v.union(v.literal("delivered"), v.literal("failed_retryable")),
     attempts: v.number(),
     providerMessageId: v.optional(v.string()),
@@ -304,10 +347,26 @@ export const settleOutbound = internalMutation({
   },
   returns: v.null(),
   handler: async (ctx, args) => {
+    const leaseIdHash = requireLeaseIdHash(args.leaseIdHash);
     const outbound = await ctx.db.query("outboundDeliveries")
       .withIndex("by_outbound_id", (q) => q.eq("outboundId", args.outboundId)).unique();
     if (!outbound) throw new ConvexError({ code: "OUTBOUND_NOT_FOUND", message: "Outbound delivery not found" });
+    if (!outbound.leaseIdHash || outbound.leaseIdHash !== leaseIdHash) {
+      throw new ConvexError({
+        code: "OUTBOUND_LEASE_MISMATCH",
+        message: "Outbound settlement lease is not current",
+      });
+    }
     if (outbound.status === "delivered") return null;
+    if (
+      outbound.status !== "in_flight" &&
+      outbound.status !== "reconciliation_required"
+    ) {
+      throw new ConvexError({
+        code: "OUTBOUND_NOT_IN_FLIGHT",
+        message: "Outbound delivery has no active lease",
+      });
+    }
     if (args.status === "delivered" && !args.providerMessageId) {
       throw new ConvexError({ code: "INVALID_SETTLEMENT", message: "Delivered settlement needs providerMessageId" });
     }
@@ -321,3 +380,103 @@ export const settleOutbound = internalMutation({
     return null;
   },
 });
+
+export const reconcileOutbound = internalMutation({
+  args: {
+    outboundId: v.string(),
+    disposition: v.union(v.literal("requeue"), v.literal("mark_delivered")),
+    providerMessageId: v.optional(v.string()),
+  },
+  returns: v.object({
+    status: v.union(
+      v.literal("requeued"),
+      v.literal("delivered"),
+      v.literal("already_delivered"),
+    ),
+  }),
+  handler: async (ctx, args) => {
+    const outboundId = requireBoundedString(args.outboundId, "outboundId", 256);
+    const providerMessageId = args.providerMessageId === undefined
+      ? undefined
+      : requireBoundedString(args.providerMessageId, "providerMessageId", 300);
+    if (args.disposition === "mark_delivered" && !providerMessageId) {
+      throw new ConvexError({
+        code: "INVALID_RECONCILIATION",
+        message: "Marking an outbound delivery delivered requires providerMessageId",
+      });
+    }
+    const outbound = await ctx.db.query("outboundDeliveries")
+      .withIndex("by_outbound_id", (q) => q.eq("outboundId", outboundId))
+      .unique();
+    if (!outbound) {
+      throw new ConvexError({
+        code: "OUTBOUND_NOT_FOUND",
+        message: "Outbound delivery not found",
+      });
+    }
+    if (outbound.status === "delivered") {
+      if (
+        args.disposition === "mark_delivered" &&
+        outbound.providerMessageId === providerMessageId
+      ) {
+        return { status: "already_delivered" as const };
+      }
+      throw new ConvexError({
+        code: "OUTBOUND_ALREADY_DELIVERED",
+        message: "Outbound delivery is already delivered with different reconciliation data",
+      });
+    }
+    if (outbound.status !== "reconciliation_required") {
+      throw new ConvexError({
+        code: "RECONCILIATION_NOT_REQUIRED",
+        message: "Outbound delivery does not require reconciliation",
+      });
+    }
+    const now = Date.now();
+    if (args.disposition === "mark_delivered") {
+      await ctx.db.patch(outbound._id, {
+        status: "delivered",
+        providerMessageId,
+        lastErrorCode: undefined,
+        updatedAt: now,
+      });
+      await writeAudit(ctx, {
+        ownerId: outbound.ownerId,
+        actor: "system",
+        action: "outbound_delivery.marked_delivered_after_reconciliation",
+        targetType: "outbound_delivery",
+        targetId: outbound._id,
+        outcome: "succeeded",
+        now,
+      });
+      return { status: "delivered" as const };
+    }
+    await ctx.db.patch(outbound._id, {
+      status: "pending",
+      leaseIdHash: undefined,
+      leaseExpiresAt: undefined,
+      lastErrorCode: "operator_requeued_ambiguous",
+      updatedAt: now,
+    });
+    await writeAudit(ctx, {
+      ownerId: outbound.ownerId,
+      actor: "system",
+      action: "outbound_delivery.requeued_after_reconciliation",
+      targetType: "outbound_delivery",
+      targetId: outbound._id,
+      outcome: "accepted",
+      now,
+    });
+    return { status: "requeued" as const };
+  },
+});
+
+function requireLeaseIdHash(value: string): string {
+  if (!/^[a-f0-9]{64}$/u.test(value)) {
+    throw new ConvexError({
+      code: "INVALID_LEASE_ID",
+      message: "Outbound lease identifier is invalid",
+    });
+  }
+  return value;
+}

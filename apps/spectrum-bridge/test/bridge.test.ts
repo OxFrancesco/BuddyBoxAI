@@ -20,7 +20,7 @@ function outbound(overrides: Partial<OutboundMessage> = {}): OutboundMessage {
     outboundId: "delivery-out-1",
     idempotencyKey: "outbound:delivery-out-1",
     spaceId: "opaque-space",
-    text: "Connect your iChef account at https://example.test/connect/token",
+    text: "Connect your BuddyBox account at https://example.test/connect/token",
     ...overrides,
   };
 }
@@ -29,7 +29,7 @@ function fakeControlPlane(overrides: Partial<ControlPlane> = {}): ControlPlane {
   return {
     acceptInbound: async () => ({ status: "accepted", deliveryId: "delivery-in-1" }),
     completeChallenge: async () => ({ status: "invalid" }),
-    claimOutbound: async () => ({ status: "claimed" }),
+    claimOutbound: async () => ({ status: "claimed", leaseToken: "lease-token-1" }),
     settleOutbound: async () => undefined,
     ...overrides,
   };
@@ -49,7 +49,7 @@ describe("iMessage bridge seam", () => {
       sleep: async () => undefined,
     });
 
-    await bridge.acceptInbound({ ...inbound, text: "ICHEF-KM7Q2P" });
+    await bridge.acceptInbound({ ...inbound, text: "BUDDYBOX-KM7Q2P" });
     expect(challenge).toBe("KM7Q2P");
   });
 
@@ -75,6 +75,7 @@ describe("iMessage bridge seam", () => {
     expect(settlements).toEqual([
       {
         outboundId: "delivery-out-1",
+        leaseToken: "lease-token-1",
         status: "delivered",
         attempts: 3,
         providerMessageId: "sent-3",
@@ -91,6 +92,22 @@ describe("iMessage bridge seam", () => {
     });
 
     expect(await bridge.deliverOutbound(outbound())).toEqual({ status: "duplicate" });
+    expect(sends).toBe(0);
+  });
+
+  test("does not send an outbound message whose expired lease requires reconciliation", async () => {
+    let sends = 0;
+    const bridge = createBridge({
+      controlPlane: fakeControlPlane({
+        claimOutbound: async () => ({ status: "reconciliation_required" }),
+      }),
+      transport: { sendText: async () => (sends += 1, { providerMessageId: "unexpected" }) },
+      sleep: async () => undefined,
+    });
+
+    expect(await bridge.deliverOutbound(outbound())).toEqual({
+      status: "reconciliation_required",
+    });
     expect(sends).toBe(0);
   });
 
@@ -117,5 +134,29 @@ describe("iMessage bridge seam", () => {
       providerMessageId: "sent-once",
     });
     expect(sends).toBe(1);
+  });
+
+  test("settles only with the lease returned by the successful claim", async () => {
+    const settlements: unknown[] = [];
+    const bridge = createBridge({
+      controlPlane: fakeControlPlane({
+        claimOutbound: async () => ({
+          status: "claimed",
+          leaseToken: "fresh-high-entropy-lease-token",
+        }),
+        settleOutbound: async (settlement) => void settlements.push(settlement),
+      }),
+      transport: { sendText: async () => ({ providerMessageId: "sent-with-lease" }) },
+      sleep: async () => undefined,
+    });
+
+    await bridge.deliverOutbound(outbound());
+    expect(settlements).toEqual([{
+      outboundId: "delivery-out-1",
+      leaseToken: "fresh-high-entropy-lease-token",
+      status: "delivered",
+      attempts: 1,
+      providerMessageId: "sent-with-lease",
+    }]);
   });
 });

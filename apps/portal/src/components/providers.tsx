@@ -3,8 +3,11 @@ import { ConvexReactClient } from "convex/react";
 import { ConvexProviderWithClerk } from "convex/react-clerk";
 import type { ReactNode } from "react";
 
+import { parseClerkPublishableKey } from "~/lib/clerk-config";
+
 const convexUrl = import.meta.env.VITE_CONVEX_URL as string | undefined;
 const convex = convexUrl ? new ConvexReactClient(convexUrl) : null;
+const clerkPublishableKey = parseClerkPublishableKey(import.meta.env.VITE_CLERK_PUBLISHABLE_KEY);
 
 function ConvexBridge({ children }: { children: ReactNode }) {
   if (!convex) return children;
@@ -18,6 +21,7 @@ function ConvexBridge({ children }: { children: ReactNode }) {
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <ClerkProvider
+      publishableKey={clerkPublishableKey}
       signInUrl="/sign-in"
       signUpUrl="/sign-up"
       afterSignOutUrl="/"

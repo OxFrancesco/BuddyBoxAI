@@ -8,14 +8,14 @@ export const Route = createFileRoute("/sign-up/$")({ component: SignUpPage });
 function SignUpPage() {
   return (
     <main className="auth-page">
-      <a className="brand" href="/" aria-label="iChef home">
+      <a className="brand" href="/" aria-label="BuddyBox home">
         <BrandMark />
-        <span>iChef</span>
+        <span>BuddyBox</span>
       </a>
       <div className="auth-card">
-        <p className="eyebrow">Invitation-only mise en place</p>
-        <h1>Open your iChef kitchen.</h1>
-        <p>Start with identity, then bind iMessage, ChatGPT, and GitHub before the first project.</p>
+        <p className="eyebrow">Google sign-up · secured by Clerk</p>
+        <h1>Open your BuddyBox kitchen.</h1>
+        <p>Start with Google, then verify iMessage or X Chat and separately connect ChatGPT, GitHub, and Convex.</p>
         <SignUp routing="path" path="/sign-up" signInUrl="/sign-in" />
       </div>
     </main>

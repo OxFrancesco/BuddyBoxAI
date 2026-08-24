@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "@ichef/contracts",
+      "name": "@buddybox/contracts",
       "dependencies": {
         "zod": "^4.1.5",
       },

@@ -1,6 +1,6 @@
-# @ichef/codex-connection
+# @buddybox/codex-connection
 
-Production-shaped ChatGPT/Codex subscription connection logic for iChef. The
+Production-shaped ChatGPT/Codex subscription connection logic for BuddyBox. The
 package follows Pi's native OpenAI Codex device-code contract and BeeGreat's
 hosted credential-broker design: each user connects their own ChatGPT account,
 durable storage contains only AES-256-GCM ciphertext, refresh rotation is
@@ -51,7 +51,7 @@ The Convex integration must implement `CodexConnectionRepository`:
 
 Create one 32-byte production key and initialize
 `AesGcmSecretVault.fromBase64Key`. Keep that key in Convex's server environment
-as `ICHEF_CODEX_CREDENTIAL_KEY`; never in Clerk metadata, Worker vars exposed to
+as `BUDDYBOX_CODEX_CREDENTIAL_KEY`; never in Clerk metadata, Worker vars exposed to
 the client, logs, checkpoints, or a sandbox. Associated data binds every
 ciphertext to its Clerk user, purpose, and (for device secrets) session.
 

@@ -10,10 +10,10 @@ export const Route = createRootRoute({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "iChef — Build from iMessage" },
+      { title: "BuddyBox — Build from iMessage or X Chat" },
       {
         name: "description",
-        content: "Your coding agent in iMessage. From first text to a shipped TanStack, Clerk, and Convex website.",
+        content: "Your coding agent in iMessage or X Chat. From first message to a shipped TanStack, Clerk, and Convex website.",
       },
       { name: "theme-color", content: "#0c0d0b" },
     ],

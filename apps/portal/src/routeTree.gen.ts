@@ -10,11 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as HostingRouteImport } from './routes/hosting'
 import { Route as ConnectChatgptRouteImport } from './routes/connect.chatgpt'
-import { Route as ConnectCloudflareRouteImport } from './routes/connect.cloudflare'
 import { Route as ConnectConvexRouteImport } from './routes/connect.convex'
 import { Route as ConnectGithubRouteImport } from './routes/connect.github'
 import { Route as ConnectImessageRouteImport } from './routes/connect.imessage'
+import { Route as ConnectXchatRouteImport } from './routes/connect.xchat'
+import { Route as ProjectsNewRouteImport } from './routes/projects.new'
 import { Route as SignInSplatRouteImport } from './routes/sign-in.$'
 import { Route as SignUpSplatRouteImport } from './routes/sign-up.$'
 
@@ -23,14 +25,14 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const HostingRoute = HostingRouteImport.update({
+  id: '/hosting',
+  path: '/hosting',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ConnectChatgptRoute = ConnectChatgptRouteImport.update({
   id: '/connect/chatgpt',
   path: '/connect/chatgpt',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ConnectCloudflareRoute = ConnectCloudflareRouteImport.update({
-  id: '/connect/cloudflare',
-  path: '/connect/cloudflare',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ConnectConvexRoute = ConnectConvexRouteImport.update({
@@ -48,6 +50,16 @@ const ConnectImessageRoute = ConnectImessageRouteImport.update({
   path: '/connect/imessage',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ConnectXchatRoute = ConnectXchatRouteImport.update({
+  id: '/connect/xchat',
+  path: '/connect/xchat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProjectsNewRoute = ProjectsNewRouteImport.update({
+  id: '/projects/new',
+  path: '/projects/new',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SignInSplatRoute = SignInSplatRouteImport.update({
   id: '/sign-in/$',
   path: '/sign-in/$',
@@ -61,32 +73,38 @@ const SignUpSplatRoute = SignUpSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/hosting': typeof HostingRoute
   '/connect/chatgpt': typeof ConnectChatgptRoute
-  '/connect/cloudflare': typeof ConnectCloudflareRoute
   '/connect/convex': typeof ConnectConvexRoute
   '/connect/github': typeof ConnectGithubRoute
   '/connect/imessage': typeof ConnectImessageRoute
+  '/connect/xchat': typeof ConnectXchatRoute
+  '/projects/new': typeof ProjectsNewRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/hosting': typeof HostingRoute
   '/connect/chatgpt': typeof ConnectChatgptRoute
-  '/connect/cloudflare': typeof ConnectCloudflareRoute
   '/connect/convex': typeof ConnectConvexRoute
   '/connect/github': typeof ConnectGithubRoute
   '/connect/imessage': typeof ConnectImessageRoute
+  '/connect/xchat': typeof ConnectXchatRoute
+  '/projects/new': typeof ProjectsNewRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/hosting': typeof HostingRoute
   '/connect/chatgpt': typeof ConnectChatgptRoute
-  '/connect/cloudflare': typeof ConnectCloudflareRoute
   '/connect/convex': typeof ConnectConvexRoute
   '/connect/github': typeof ConnectGithubRoute
   '/connect/imessage': typeof ConnectImessageRoute
+  '/connect/xchat': typeof ConnectXchatRoute
+  '/projects/new': typeof ProjectsNewRoute
   '/sign-in/$': typeof SignInSplatRoute
   '/sign-up/$': typeof SignUpSplatRoute
 }
@@ -94,42 +112,50 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/hosting'
     | '/connect/chatgpt'
-    | '/connect/cloudflare'
     | '/connect/convex'
     | '/connect/github'
     | '/connect/imessage'
+    | '/connect/xchat'
+    | '/projects/new'
     | '/sign-in/$'
     | '/sign-up/$'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/hosting'
     | '/connect/chatgpt'
-    | '/connect/cloudflare'
     | '/connect/convex'
     | '/connect/github'
     | '/connect/imessage'
+    | '/connect/xchat'
+    | '/projects/new'
     | '/sign-in/$'
     | '/sign-up/$'
   id:
     | '__root__'
     | '/'
+    | '/hosting'
     | '/connect/chatgpt'
-    | '/connect/cloudflare'
     | '/connect/convex'
     | '/connect/github'
     | '/connect/imessage'
+    | '/connect/xchat'
+    | '/projects/new'
     | '/sign-in/$'
     | '/sign-up/$'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  HostingRoute: typeof HostingRoute
   ConnectChatgptRoute: typeof ConnectChatgptRoute
-  ConnectCloudflareRoute: typeof ConnectCloudflareRoute
   ConnectConvexRoute: typeof ConnectConvexRoute
   ConnectGithubRoute: typeof ConnectGithubRoute
   ConnectImessageRoute: typeof ConnectImessageRoute
+  ConnectXchatRoute: typeof ConnectXchatRoute
+  ProjectsNewRoute: typeof ProjectsNewRoute
   SignInSplatRoute: typeof SignInSplatRoute
   SignUpSplatRoute: typeof SignUpSplatRoute
 }
@@ -143,18 +169,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/hosting': {
+      id: '/hosting'
+      path: '/hosting'
+      fullPath: '/hosting'
+      preLoaderRoute: typeof HostingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/connect/chatgpt': {
       id: '/connect/chatgpt'
       path: '/connect/chatgpt'
       fullPath: '/connect/chatgpt'
       preLoaderRoute: typeof ConnectChatgptRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/connect/cloudflare': {
-      id: '/connect/cloudflare'
-      path: '/connect/cloudflare'
-      fullPath: '/connect/cloudflare'
-      preLoaderRoute: typeof ConnectCloudflareRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/connect/convex': {
@@ -178,6 +204,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConnectImessageRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/connect/xchat': {
+      id: '/connect/xchat'
+      path: '/connect/xchat'
+      fullPath: '/connect/xchat'
+      preLoaderRoute: typeof ConnectXchatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/projects/new': {
+      id: '/projects/new'
+      path: '/projects/new'
+      fullPath: '/projects/new'
+      preLoaderRoute: typeof ProjectsNewRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sign-in/$': {
       id: '/sign-in/$'
       path: '/sign-in/$'
@@ -197,11 +237,13 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  HostingRoute: HostingRoute,
   ConnectChatgptRoute: ConnectChatgptRoute,
-  ConnectCloudflareRoute: ConnectCloudflareRoute,
   ConnectConvexRoute: ConnectConvexRoute,
   ConnectGithubRoute: ConnectGithubRoute,
   ConnectImessageRoute: ConnectImessageRoute,
+  ConnectXchatRoute: ConnectXchatRoute,
+  ProjectsNewRoute: ProjectsNewRoute,
   SignInSplatRoute: SignInSplatRoute,
   SignUpSplatRoute: SignUpSplatRoute,
 }

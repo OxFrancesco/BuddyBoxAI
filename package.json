@@ -1,5 +1,5 @@
 {
-  "name": "ichef",
+  "name": "buddybox",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -8,19 +8,26 @@
     "apps/*",
     "apps/*/runner",
     "packages/*",
+    "prototypes/*",
+    "prototypes/*/runner",
     "starters/*"
   ],
   "scripts": {
     "dev": "bun run --cwd apps/portal dev",
     "dev:gateway": "bun run --cwd apps/agent-gateway dev",
+    "dev:xchat": "bun run --cwd apps/xchat-bridge dev",
+    "dev:site-host": "bun run --cwd apps/site-host dev",
     "build": "bun run --cwd apps/portal build",
-    "test": "bun test convex/*.test.ts packages/contracts/src/*.test.ts packages/provisioning/src/*.test.ts packages/codex-connection/test/*.test.ts apps/control-plane/src/*.test.ts apps/credential-broker/src/*.test.ts apps/agent-gateway/test/*.test.ts apps/agent-gateway/runner/test/*.test.ts apps/spectrum-bridge/test/*.test.ts apps/portal/src/lib/*.test.ts starters/tanstack-clerk-convex/convex/*.test.ts starters/tanstack-clerk-convex/src/lib/*.test.ts",
-    "typecheck": "bun run typecheck:contracts && bun run typecheck:convex && bun run typecheck:gateway && bun run typecheck:portal && bun run typecheck:spectrum && bun run typecheck:provisioning && bun run typecheck:codex && bun run typecheck:control-plane && bun run typecheck:credential-broker && bun run typecheck:starter",
+    "test": "bun test convex/*.test.ts packages/contracts/src/*.test.ts packages/provisioning/src/*.test.ts packages/codex-connection/test/*.test.ts apps/control-plane/src/*.test.ts apps/credential-broker/src/*.test.ts apps/agent-gateway/test/*.test.ts apps/agent-gateway/runner/test/*.test.ts apps/spectrum-bridge/test/*.test.ts apps/xchat-bridge/test/*.test.ts apps/site-host/src/*.test.ts apps/portal/src/lib/*.test.ts prototypes/pi-sandbox-runtime/src/*.test.ts starters/tanstack-clerk-convex/convex/*.test.ts starters/tanstack-clerk-convex/src/lib/*.test.ts",
+    "typecheck": "bun run typecheck:contracts && bun run typecheck:convex && bun run typecheck:gateway && bun run typecheck:portal && bun run typecheck:spectrum && bun run typecheck:xchat && bun run typecheck:site-host && bun run typecheck:prototype && bun run typecheck:provisioning && bun run typecheck:codex && bun run typecheck:control-plane && bun run typecheck:credential-broker && bun run typecheck:starter",
     "typecheck:contracts": "bun run --cwd packages/contracts typecheck",
     "typecheck:convex": "bunx tsc --noEmit -p convex/tsconfig.json",
     "typecheck:gateway": "bun run --cwd apps/agent-gateway typecheck",
     "typecheck:portal": "bun run --cwd apps/portal typecheck",
     "typecheck:spectrum": "bun run --cwd apps/spectrum-bridge typecheck",
+    "typecheck:xchat": "bun run --cwd apps/xchat-bridge typecheck",
+    "typecheck:site-host": "bun run --cwd apps/site-host typecheck",
+    "typecheck:prototype": "bun run --cwd prototypes/pi-sandbox-runtime typecheck",
     "typecheck:provisioning": "bun run --cwd packages/provisioning typecheck",
     "typecheck:codex": "bun run --cwd packages/codex-connection typecheck",
     "typecheck:control-plane": "bun run --cwd apps/control-plane typecheck",
@@ -30,12 +37,18 @@
     "verify": "bun run typecheck && bun run test && bun run build && bun run build:starter",
     "convex:dev": "bunx convex dev",
     "convex:deploy": "bunx convex deploy",
+    "deploy:control-plane": "bun run --cwd apps/control-plane deploy",
+    "deploy:credential-broker": "bun run --cwd apps/credential-broker deploy",
     "deploy:portal": "bun run --cwd apps/portal deploy",
-    "deploy:gateway": "bun run --cwd apps/agent-gateway deploy"
+    "deploy:gateway": "bun run --cwd apps/agent-gateway deploy",
+    "deploy:site-host": "bun run --cwd apps/site-host deploy"
   },
   "dependencies": {
-    "@ichef/codex-connection": "workspace:*",
+    "@buddybox/codex-connection": "workspace:*",
     "convex": "^1.43.0"
+  },
+  "overrides": {
+    "@opentelemetry/core": "^2.10.0"
   },
   "devDependencies": {
     "@types/bun": "^1.3.14",

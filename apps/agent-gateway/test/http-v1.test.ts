@@ -11,7 +11,18 @@ function ndjson(values: unknown[]): Response {
 function harness(
   userId = "user_alice",
   sharedLocators: RuntimeLocator[] = [],
-  authorityOverride: Partial<{ projectId: string; action: "admission" | "run" | "cancel" | "heartbeat" | "checkpoint" | "replacement" | "preview" | "artifact"; capability: string }> = {},
+  authorityOverride: Partial<{
+    projectId: string;
+    sandboxGeneration: number;
+    action: "admission" | "run" | "cancel" | "heartbeat" | "checkpoint" | "replacement" | "preview" | "artifact_read" | "screenshot" | "deploy";
+    capability: string;
+    runId: string;
+    releaseId: string;
+    sourceRunId: string;
+    commitSha: string;
+    hostname: string;
+    artifactManifestDigest: string;
+  }> = {},
 ) {
   const calls: Array<{ operation: string; value?: unknown }> = [];
   const runtime: RuntimeHandle = {
@@ -67,6 +78,7 @@ function harness(
       if (request.headers.get("authorization") !== "Bearer valid") return null;
       const path = new URL(request.url).pathname;
       const projectId = /^\/v1\/projects\/([^/]+)/.exec(path)?.[1] ?? "unknown";
+      const sandboxGeneration = Number(/^\/v1\/projects\/[^/]+\/generations\/([^/]+)/.exec(path)?.[1] ?? 1);
       const action = path.endsWith("/admission") ? "admission"
         : path.endsWith("/runs") ? "run"
         : path.endsWith("/cancel") ? "cancel"
@@ -74,8 +86,18 @@ function harness(
         : path.endsWith("/checkpoints") ? "checkpoint"
         : path.endsWith("/replacement") || path.endsWith("/teardown") ? "replacement"
         : path.endsWith("/previews") ? "preview"
-        : "artifact";
-      return { userId, projectId, action, capability: "valid", ...authorityOverride } as const;
+        : path.endsWith("/screenshots") ? "screenshot"
+        : path.endsWith("/deployments") ? "deploy"
+        : "artifact_read";
+      const runId = /^.*\/runs\/([^/]+)\/(?:cancel|heartbeat)$/.exec(path)?.[1] ?? (action === "run" ? "run_one" : undefined);
+      const deployBindings = action === "deploy" ? {
+        releaseId: "release_one",
+        sourceRunId: "run_one",
+        commitSha: "0123456789abcdef",
+        hostname: "demo-project-one-buddybox-sites.buddytools.org",
+        artifactManifestDigest: "7c48613db64ab113a1ac92de092a5a957bd0fac38e19eb328ed130e9df0007ad",
+      } : {};
+      return { userId, projectId, sandboxGeneration, action, capability: "valid", ...(runId ? { runId } : {}), ...deployBindings, ...authorityOverride } as const;
     },
     runtimeFor(locator) {
       locators.push(locator);
@@ -88,6 +110,15 @@ function harness(
       async get(key) {
         return objects.get(key) ?? null;
       },
+    },
+    async publishSite(request) {
+      calls.push({ operation: "publish-site", value: request });
+      return {
+        projectId: request.projectId,
+        releaseId: request.releaseId,
+        deploymentRef: "r2:v1:published",
+        liveUrl: `https://${request.hostname}`,
+      };
     },
     now: () => new Date("2026-08-13T12:00:00.000Z"),
     randomId: () => "checkpoint-fixed",
@@ -120,8 +151,8 @@ describe("v1 gateway HTTP seam", () => {
     const bobHandler = harness("user_bob", locators).handler;
     await bobHandler.fetch(api("/v1/projects/project_same/generations/1/heartbeat"));
     expect(locators).toHaveLength(2);
-    expect(locators[0]?.sandboxId).toMatch(/^ichef-1-[a-f0-9]{24}$/);
-    expect(locators[1]?.sandboxId).toMatch(/^ichef-1-[a-f0-9]{24}$/);
+    expect(locators[0]?.sandboxId).toMatch(/^buddybox-1-[a-f0-9]{24}$/);
+    expect(locators[1]?.sandboxId).toMatch(/^buddybox-1-[a-f0-9]{24}$/);
     expect(locators[0]?.sandboxId).not.toBe(locators[1]?.sandboxId);
   });
 
@@ -131,10 +162,43 @@ describe("v1 gateway HTTP seam", () => {
     expect(projectResponse.status).toBe(401);
     expect(wrongProject.calls).toEqual([]);
 
-    const wrongAction = harness("user_alice", [], { action: "artifact" });
+    const wrongAction = harness("user_alice", [], { action: "artifact_read" });
     const actionResponse = await wrongAction.handler.fetch(api("/v1/projects/project_one/generations/1/heartbeat"));
     expect(actionResponse.status).toBe(401);
     expect(wrongAction.calls).toEqual([]);
+  });
+
+  test("rejects arbitrary Sandbox generations and sibling artifact-operation escalation", async () => {
+    const wrongGeneration = harness("user_alice", [], { sandboxGeneration: 2 });
+    expect((await wrongGeneration.handler.fetch(api("/v1/projects/project_one/generations/1/heartbeat"))).status).toBe(401);
+    expect(wrongGeneration.calls).toEqual([]);
+
+    const siblingAction = harness("user_alice", [], { action: "artifact_read" });
+    expect((await siblingAction.handler.fetch(api("/v1/projects/project_one/generations/1/screenshots", {
+      method: "POST",
+      body: JSON.stringify({ port: 3000 }),
+    }))).status).toBe(401);
+    expect(siblingAction.calls).toEqual([]);
+
+    const reverseSibling = harness("user_alice", [], { action: "screenshot" });
+    expect((await reverseSibling.handler.fetch(api("/v1/projects/project_one/generations/1/artifacts?path=dist/index.html"))).status).toBe(401);
+    expect(reverseSibling.calls).toEqual([]);
+  });
+
+  test("keeps exact screenshot and artifact-read capabilities working", async () => {
+    const screenshot = harness();
+    const screenshotResponse = await screenshot.handler.fetch(api("/v1/projects/project_one/generations/1/screenshots", {
+      method: "POST",
+      body: JSON.stringify({ port: 3000 }),
+    }));
+    expect(screenshotResponse.status).toBe(200);
+    expect(screenshot.calls).toEqual([{ operation: "screenshot", value: { port: 3000, path: "/", width: 1440, height: 900 } }]);
+
+    const artifact = harness();
+    const artifactResponse = await artifact.handler.fetch(api("/v1/projects/project_one/generations/1/artifacts?path=dist/index.html"));
+    expect(artifactResponse.status).toBe(200);
+    expect(await artifactResponse.text()).toBe("artifact");
+    expect(artifact.calls).toEqual([{ operation: "artifact", value: "dist/index.html" }]);
   });
 
   test("rejects a nested Run capability that differs from the authenticated authority", async () => {
@@ -150,6 +214,27 @@ describe("v1 gateway HTTP seam", () => {
       }),
     }));
     expect(response.status).toBe(401);
+    expect(calls).toEqual([]);
+  });
+
+  test("binds Run operations to the exact Run id", async () => {
+    const { handler, calls } = harness("user_alice", [], { runId: "run_one" });
+    const start = await handler.fetch(api("/v1/projects/project_one/generations/1/runs", {
+      method: "POST",
+      body: JSON.stringify({
+        runId: "run_two",
+        prompt: "Try a sibling Run",
+        provider: "openai-codex",
+        model: "gpt-5.6",
+        capability: "valid",
+      }),
+    }));
+    expect(start.status).toBe(401);
+    const cancel = await handler.fetch(api("/v1/projects/project_one/generations/1/runs/run_two/cancel", {
+      method: "POST",
+      body: "{}",
+    }));
+    expect(cancel.status).toBe(401);
     expect(calls).toEqual([]);
   });
 
@@ -294,5 +379,68 @@ describe("v1 gateway HTTP seam", () => {
       lastEventSequence: 7,
       observedAt: "2026-08-13T12:00:00.000Z",
     });
+  });
+
+  test("publishes only declared, digest-matching build artifacts", async () => {
+    const { handler, calls } = harness();
+    const digest = "c7c5c1d70c5dec4416ab6158afd0b223ef40c29b1dc1f97ed9428b94d4cadb1c";
+    const response = await handler.fetch(api("/v1/projects/project_one/generations/1/deployments", {
+      method: "POST",
+      body: JSON.stringify({
+        releaseId: "release_one",
+        commitSha: "0123456789abcdef",
+        hostname: "demo-project-one-buddybox-sites.buddytools.org",
+        assets: [{ path: "index.html", workspacePath: "dist/index.html", sha256: digest }],
+      }),
+    }));
+
+    expect(response.status).toBe(201);
+    expect(await response.json()).toEqual({
+      protocolVersion: "2026-08-13",
+      projectId: "project_one",
+      releaseId: "release_one",
+      deploymentRef: "r2:v1:published",
+      liveUrl: "https://demo-project-one-buddybox-sites.buddytools.org",
+    });
+    expect(calls).toEqual([
+      { operation: "artifact", value: "dist/index.html" },
+      {
+        operation: "publish-site",
+        value: {
+          capability: "valid",
+          projectId: "project_one",
+          releaseId: "release_one",
+          sourceRunId: "run_one",
+          commitSha: "0123456789abcdef",
+          hostname: "demo-project-one-buddybox-sites.buddytools.org",
+          artifactManifestDigest: "7c48613db64ab113a1ac92de092a5a957bd0fac38e19eb328ed130e9df0007ad",
+          assets: [{ path: "index.html", data: "YXJ0aWZhY3Q=", sha256: digest }],
+        },
+      },
+    ]);
+  });
+
+  test("rejects deployment authority bound to a different release or manifest before reading artifacts", async () => {
+    for (const authority of [
+      { releaseId: "release_two" },
+      { artifactManifestDigest: "0".repeat(64) },
+    ]) {
+      const { handler, calls } = harness("user_alice", [], authority);
+      const response = await handler.fetch(api("/v1/projects/project_one/generations/1/deployments", {
+        method: "POST",
+        body: JSON.stringify({
+          releaseId: "release_one",
+          commitSha: "0123456789abcdef",
+          hostname: "demo-project-one-buddybox-sites.buddytools.org",
+          assets: [{
+            path: "index.html",
+            workspacePath: "dist/index.html",
+            sha256: "c7c5c1d70c5dec4416ab6158afd0b223ef40c29b1dc1f97ed9428b94d4cadb1c",
+          }],
+        }),
+      }));
+      expect(response.status).toBe(401);
+      expect(calls).toEqual([]);
+    }
   });
 });

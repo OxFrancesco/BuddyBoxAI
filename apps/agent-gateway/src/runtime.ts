@@ -34,7 +34,7 @@ export async function deriveSandboxId(userId: string, projectId: string, generat
   const source = new TextEncoder().encode(`${userId}\u0000${projectId}\u0000${generation}`);
   const digest = new Uint8Array(await crypto.subtle.digest("SHA-256", source));
   const suffix = [...digest.slice(0, 12)].map((byte) => byte.toString(16).padStart(2, "0")).join("");
-  return `ichef-${generation}-${suffix}`;
+  return `buddybox-${generation}-${suffix}`;
 }
 
 export function checkpointKey(userId: string, projectId: string, checkpointId: string): string {

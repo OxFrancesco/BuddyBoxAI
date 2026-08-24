@@ -3,14 +3,21 @@ export {};
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
-const baseUrl = process.env.ICHEF_PROBE_URL ?? "http://127.0.0.1:8877";
+const baseUrl = process.env.BUDDYBOX_PROBE_URL ?? "http://127.0.0.1:8877";
+const sharedSecret = process.env.BUDDYBOX_PROTOTYPE_SECRET;
+if (!sharedSecret || sharedSecret.length < 32) {
+  throw new Error("BUDDYBOX_PROTOTYPE_SECRET must contain at least 32 characters");
+}
 const sandboxId = `pi-probe-${Date.now().toString(36)}`;
 const execFileAsync = promisify(execFile);
 
 async function request(path: string, init: RequestInit = {}) {
+  const headers = new Headers(init.headers);
+  headers.set("authorization", `Bearer ${sharedSecret}`);
   const response = await fetch(`${baseUrl}/api/sandboxes/${sandboxId}${path}`, {
     method: "POST",
     ...init,
+    headers,
   });
   if (!response.ok) throw new Error(`${path}: ${response.status} ${await response.text()}`);
   return response;
@@ -77,7 +84,7 @@ try {
       external = {
         attempted: true,
         status: response.status,
-        containsHeadline: html.includes("Dinner is served by iChef"),
+        containsHeadline: html.includes("Dinner is served by BuddyBox"),
       };
     } catch (error) {
       external = {

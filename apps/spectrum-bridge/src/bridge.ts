@@ -10,7 +10,7 @@ import type {
 
 const DEFAULT_MAX_SEND_ATTEMPTS = 3;
 const MAX_OUTBOUND_CHARACTERS = 6_000;
-const CHALLENGE_PATTERN = /^ICHEF[- ]([A-HJ-NP-Z2-9]{6,10})$/i;
+const CHALLENGE_PATTERN = /^BUDDYBOX[- ]([A-HJ-NP-Z2-9]{6,10})$/i;
 
 export interface ControlPlane {
   acceptInbound(message: NormalizedInbound): Promise<InboundResult>;
@@ -37,6 +37,7 @@ export type DeliveryResult =
   | { status: "delivered"; attempts: number; providerMessageId: string }
   | { status: "duplicate" }
   | { status: "in_flight" }
+  | { status: "reconciliation_required" }
   | { status: "settlement_pending"; attempts: number; providerMessageId: string }
   | { status: "failed_retryable"; attempts: number };
 
@@ -61,6 +62,9 @@ export function createBridge(options: BridgeOptions): Bridge {
     });
     if (claim.status === "already_delivered") return { status: "duplicate" };
     if (claim.status === "in_flight") return { status: "in_flight" };
+    if (claim.status === "reconciliation_required") {
+      return { status: "reconciliation_required" };
+    }
 
     for (let attempt = 1; attempt <= maxSendAttempts; attempt += 1) {
       let sent: { providerMessageId: string };
@@ -75,6 +79,7 @@ export function createBridge(options: BridgeOptions): Bridge {
 
       const settlement: OutboundSettlement = {
         outboundId: message.outboundId,
+        leaseToken: claim.leaseToken,
         status: "delivered",
         attempts: attempt,
         providerMessageId: sent.providerMessageId,
@@ -97,6 +102,7 @@ export function createBridge(options: BridgeOptions): Bridge {
     try {
       await options.controlPlane.settleOutbound({
         outboundId: message.outboundId,
+        leaseToken: claim.leaseToken,
         status: "failed_retryable",
         attempts: maxSendAttempts,
         errorCode: "spectrum_unavailable",

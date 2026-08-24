@@ -1,6 +1,8 @@
 import { ConvexError, v } from "convex/values";
 
+import { internal } from "./_generated/api";
 import { internalMutation, mutation, query } from "./_generated/server";
+import { consumeApproval } from "./approvals";
 import { assertOwner, requireCurrentUser } from "./lib/auth";
 import { boundedLimit, requireBoundedString } from "./lib/bounds";
 import { projectReadiness } from "./lib/readiness";
@@ -13,6 +15,7 @@ const projectValidator = v.object({
   name: v.string(),
   slug: v.string(),
   status: projectStatusValidator,
+  hostingHostname: v.optional(v.string()),
   githubRepositoryFullName: v.string(),
   defaultBranch: v.string(),
   liveReleaseId: v.optional(v.id("releases")),
@@ -29,7 +32,10 @@ export const propose = mutation({
     payloadHash: v.string(),
     expiresAt: v.number(),
   },
-  returns: v.id("proposedProjects"),
+  returns: v.object({
+    proposalId: v.id("proposedProjects"),
+    approvalId: v.id("approvals"),
+  }),
   handler: async (ctx, args) => {
     const user = await requireCurrentUser(ctx);
     const readiness = await projectReadiness(ctx, user._id);
@@ -47,22 +53,110 @@ export const propose = mutation({
     if (args.planJson.length > 64_000 || args.brief.length > 8_000) {
       throw new ConvexError({ code: "PROPOSAL_TOO_LARGE", message: "Proposed Project payload is too large" });
     }
+    const name = requireBoundedString(args.name, "name", 120);
+    const brief = args.brief.trim();
+    const payloadHash = requireBoundedString(args.payloadHash, "payloadHash", 64).toLowerCase();
+    if (!/^[a-f0-9]{64}$/u.test(payloadHash)) {
+      throw new ConvexError({ code: "INVALID_PAYLOAD_HASH", message: "Proposal payload hash must be SHA-256" });
+    }
     const now = Date.now();
     if (args.expiresAt <= now || args.expiresAt > now + 24 * 60 * 60 * 1_000) {
       throw new ConvexError({ code: "INVALID_EXPIRY", message: "Proposal must expire within 24 hours" });
     }
-    return await ctx.db.insert("proposedProjects", {
+    const existing = await ctx.db.query("proposedProjects")
+      .withIndex("by_owner_id_and_payload_hash", (q) =>
+        q.eq("ownerId", user._id).eq("payloadHash", payloadHash),
+      )
+      .order("desc")
+      .first();
+    if (
+      existing && existing.status === "awaiting_approval" && existing.expiresAt > now &&
+      existing.approvalId
+    ) {
+      if (
+        existing.name !== name || existing.brief !== brief || existing.planJson !== args.planJson ||
+        existing.conversationId !== args.conversationId
+      ) {
+        throw new ConvexError({
+          code: "PROPOSAL_HASH_REUSED",
+          message: "Proposal hash is already bound to different content",
+        });
+      }
+      return { proposalId: existing._id, approvalId: existing.approvalId };
+    }
+    const proposalId = await ctx.db.insert("proposedProjects", {
       ownerId: user._id,
       conversationId: args.conversationId,
-      name: requireBoundedString(args.name, "name", 120),
-      brief: args.brief.trim(),
+      name,
+      brief,
       planJson: args.planJson,
-      payloadHash: args.payloadHash,
+      payloadHash,
       status: "awaiting_approval",
+      provisioningStatus: "pending",
+      provisioningAttempts: 0,
       expiresAt: args.expiresAt,
       createdAt: now,
       updatedAt: now,
     });
+    const approvalId = await ctx.db.insert("approvals", {
+      ownerId: user._id,
+      operation: "confirm_project",
+      bindingHash: payloadHash,
+      status: "pending",
+      expiresAt: args.expiresAt,
+      createdAt: now,
+      updatedAt: now,
+    });
+    await ctx.db.patch(proposalId, { approvalId });
+    return { proposalId, approvalId };
+  },
+});
+
+export const confirmProposal = mutation({
+  args: {
+    approvalId: v.id("approvals"),
+    bindingHash: v.string(),
+  },
+  returns: v.object({
+    proposalId: v.id("proposedProjects"),
+    approvalId: v.id("approvals"),
+    scheduled: v.boolean(),
+  }),
+  handler: async (ctx, args) => {
+    const user = await requireCurrentUser(ctx);
+    const bindingHash = requireBoundedString(args.bindingHash, "bindingHash", 64).toLowerCase();
+    if (!/^[a-f0-9]{64}$/u.test(bindingHash)) {
+      throw new ConvexError({ code: "INVALID_PAYLOAD_HASH", message: "Proposal payload hash must be SHA-256" });
+    }
+    const proposal = await ctx.db
+      .query("proposedProjects")
+      .withIndex("by_approval_id", (q) => q.eq("approvalId", args.approvalId))
+      .unique();
+    if (
+      !proposal ||
+      proposal.approvalId !== args.approvalId ||
+      proposal.status !== "awaiting_approval" ||
+      proposal.expiresAt <= Date.now()
+    ) {
+      throw new ConvexError({ code: "INVALID_PROPOSAL", message: "Proposal is not confirmable" });
+    }
+    const approval = await ctx.db.get(args.approvalId);
+    if (
+      approval?.ownerId === user._id && approval.operation === "confirm_project" &&
+      approval.bindingHash === bindingHash && approval.status === "consumed"
+    ) {
+      return { proposalId: proposal._id, approvalId: args.approvalId, scheduled: true };
+    }
+    await consumeApproval(ctx, {
+      ownerId: user._id,
+      approvalId: args.approvalId,
+      bindingHash,
+    });
+    await ctx.scheduler.runAfter(0, internal.orchestrator.provisionProposal, {
+      proposalId: proposal._id,
+      approvalId: args.approvalId,
+    });
+    return { proposalId: proposal._id, approvalId: args.approvalId, scheduled: true };
   },
 });
 
@@ -74,7 +168,7 @@ export const createProvisioned = internalMutation({
     slug: v.string(),
     githubRepositoryId: v.string(),
     githubRepositoryFullName: v.string(),
-    cloudflareAccountRef: v.string(),
+    defaultBranch: v.optional(v.string()),
     convexProjectRef: v.string(),
     clerkApplicationRef: v.optional(v.string()),
   },
@@ -102,7 +196,7 @@ export const createProvisioned = internalMutation({
     }
     const readiness = await projectReadiness(ctx, owner._id);
     if (!readiness.ready) throw new ConvexError({ code: "USER_NOT_PROJECT_READY", message: "Required connections are unavailable" });
-    const slug = requireBoundedString(args.slug, "slug", 80);
+    const slug = normalizedProjectSlug(args.slug);
     const existing = await ctx.db
       .query("projects")
       .withIndex("by_owner_id_and_slug", (q) => q.eq("ownerId", owner._id).eq("slug", slug))
@@ -118,14 +212,33 @@ export const createProvisioned = internalMutation({
       status: "active",
       githubRepositoryId: args.githubRepositoryId,
       githubRepositoryFullName: args.githubRepositoryFullName,
-      defaultBranch: "main",
-      cloudflareAccountRef: args.cloudflareAccountRef,
+      defaultBranch: args.defaultBranch ?? "main",
       convexProjectRef: args.convexProjectRef,
       clerkApplicationRef: args.clerkApplicationRef,
       createdAt: now,
       updatedAt: now,
     });
-    await ctx.db.patch(proposal._id, { status: "confirmed", confirmedProjectId: projectId, updatedAt: now });
+    const hostingHostname = managedHostingHostname(slug, projectId);
+    const hostnameOwner = await ctx.db
+      .query("projects")
+      .withIndex("by_hosting_hostname", (q) =>
+        q.eq("hostingHostname", hostingHostname),
+      )
+      .unique();
+    if (hostnameOwner && hostnameOwner._id !== projectId) {
+      throw new ConvexError({
+        code: "HOSTNAME_COLLISION",
+        message: "Managed hosting hostname collision",
+      });
+    }
+    await ctx.db.patch(projectId, { hostingHostname });
+    await ctx.db.patch(proposal._id, {
+      status: "confirmed",
+      provisioningStatus: "completed",
+      provisioningErrorCode: undefined,
+      confirmedProjectId: projectId,
+      updatedAt: now,
+    });
     await writeAudit(ctx, {
       ownerId: owner._id, actor: "gateway", action: "project.created",
       targetType: "project", targetId: projectId, outcome: "succeeded",
@@ -151,6 +264,7 @@ export const listMine = query({
       name: project.name,
       slug: project.slug,
       status: project.status,
+      hostingHostname: project.hostingHostname,
       githubRepositoryFullName: project.githubRepositoryFullName,
       defaultBranch: project.defaultBranch,
       liveReleaseId: project.liveReleaseId,
@@ -173,11 +287,96 @@ export const getMine = query({
       name: project.name,
       slug: project.slug,
       status: project.status,
+      hostingHostname: project.hostingHostname,
       githubRepositoryFullName: project.githubRepositoryFullName,
       defaultBranch: project.defaultBranch,
       liveReleaseId: project.liveReleaseId,
       createdAt: project.createdAt,
       updatedAt: project.updatedAt,
+    };
+  },
+});
+
+function normalizedProjectSlug(value: string): string {
+  const slug = requireBoundedString(value, "slug", 80).toLowerCase();
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,78}[a-z0-9])?$/.test(slug)) {
+    throw new ConvexError({
+      code: "INVALID_PROJECT_SLUG",
+      message: "Project slug must be a lowercase DNS label",
+    });
+  }
+  return slug;
+}
+
+function sitesBaseDomain(): string {
+  const domain = (process.env.BUDDYBOX_SITES_BASE_DOMAIN ?? "buddybox-sites.buddytools.org")
+    .trim()
+    .toLowerCase()
+    .replace(/\.$/, "");
+  if (
+    domain.length > 180 ||
+    !/^(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])$/.test(domain)
+  ) {
+    throw new ConvexError({
+      code: "INVALID_SITES_BASE_DOMAIN",
+      message: "Managed sites base domain is invalid",
+    });
+  }
+  return domain;
+}
+
+function managedHostingHostname(
+  slugValue: string,
+  projectId: string,
+): string {
+  const slug = normalizedProjectSlug(slugValue);
+  const suffix = projectId.toLowerCase();
+  if (!/^[a-z0-9]{16,48}$/.test(suffix)) {
+    throw new ConvexError({
+      code: "INVALID_PROJECT_ID",
+      message: "Project ID cannot be encoded as a hosting hostname",
+    });
+  }
+  const siteLabel = sitesBaseDomain().split(".")[0] ?? "buddybox-sites";
+  const prefixLength = 63 - suffix.length - siteLabel.length - 2;
+  const prefix = slug.slice(0, prefixLength).replace(/-+$/, "") || "site";
+  return `${prefix}-${suffix}-${sitesBaseDomain()}`;
+}
+
+export const backfillManagedHostnames = internalMutation({
+  args: { limit: v.optional(v.number()) },
+  returns: v.object({ updated: v.number(), remaining: v.boolean() }),
+  handler: async (ctx, args) => {
+    const limit = args.limit ?? 50;
+    if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+      throw new ConvexError({ code: "INVALID_LIMIT", message: "Invalid backfill limit" });
+    }
+    const rows = await ctx.db
+      .query("projects")
+      .withIndex("by_hosting_hostname", (q) => q.eq("hostingHostname", undefined))
+      .take(limit + 1);
+    for (const project of rows.slice(0, limit)) {
+      const hostingHostname = managedHostingHostname(project.slug, project._id);
+      const existing = await ctx.db
+        .query("projects")
+        .withIndex("by_hosting_hostname", (q) =>
+          q.eq("hostingHostname", hostingHostname),
+        )
+        .unique();
+      if (existing && existing._id !== project._id) {
+        throw new ConvexError({
+          code: "HOSTNAME_COLLISION",
+          message: "Managed hosting hostname collision",
+        });
+      }
+      await ctx.db.patch(project._id, {
+        hostingHostname,
+        updatedAt: Date.now(),
+      });
+    }
+    return {
+      updated: Math.min(rows.length, limit),
+      remaining: rows.length > limit,
     };
   },
 });

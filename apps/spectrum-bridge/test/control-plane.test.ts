@@ -52,4 +52,63 @@ describe("Convex HTTP adapter seam", () => {
 
     expect(adapter.acceptInbound(inbound)).rejects.toBeInstanceOf(ControlPlaneUnavailableError);
   });
+
+  test("carries the opaque lease from claim through settlement", async () => {
+    const requests: unknown[] = [];
+    const adapter = new ConvexHttpControlPlane({
+      bridgeUrl: "https://example.convex.site/v1/spectrum/bridge",
+      bridgeSecret: "bridge_secret_value",
+      fetcher: async (_input, init) => {
+        const request = JSON.parse(String(init?.body));
+        requests.push(request);
+        return Response.json({
+          ok: true,
+          result: request.operation === "claim_outbound"
+            ? { status: "claimed", leaseToken: "l".repeat(43) }
+            : null,
+        });
+      },
+    });
+
+    const claim = await adapter.claimOutbound({
+      outboundId: "outbound-1",
+      idempotencyKey: "outbound-key-1",
+    });
+    expect(claim).toEqual({ status: "claimed", leaseToken: "l".repeat(43) });
+    if (claim.status !== "claimed") throw new Error("expected claimed outbound");
+    await adapter.settleOutbound({
+      outboundId: "outbound-1",
+      leaseToken: claim.leaseToken,
+      status: "delivered",
+      attempts: 1,
+      providerMessageId: "provider-message-1",
+    });
+
+    expect(requests[1]).toEqual({
+      operation: "settle_outbound",
+      input: {
+        outboundId: "outbound-1",
+        leaseToken: "l".repeat(43),
+        status: "delivered",
+        attempts: 1,
+        providerMessageId: "provider-message-1",
+      },
+    });
+  });
+
+  test("preserves an explicit reconciliation-required claim result", async () => {
+    const adapter = new ConvexHttpControlPlane({
+      bridgeUrl: "https://example.convex.site/v1/spectrum/bridge",
+      bridgeSecret: "bridge_secret_value",
+      fetcher: async () => Response.json({
+        ok: true,
+        result: { status: "reconciliation_required" },
+      }),
+    });
+
+    expect(await adapter.claimOutbound({
+      outboundId: "outbound-ambiguous-1",
+      idempotencyKey: "outbound-ambiguous-key-1",
+    })).toEqual({ status: "reconciliation_required" });
+  });
 });

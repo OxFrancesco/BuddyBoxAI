@@ -6,7 +6,7 @@ export async function writeAudit(
   ctx: MutationCtx,
   input: {
     ownerId?: Id<"users">;
-    actor: "user" | "system" | "imessage" | "gateway";
+    actor: "user" | "system" | "imessage" | "xchat" | "gateway";
     action: string;
     targetType: string;
     targetId?: string;

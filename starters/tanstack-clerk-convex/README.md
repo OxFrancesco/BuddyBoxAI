@@ -1,6 +1,6 @@
-# iChef TanStack + Clerk + Convex starter
+# BuddyBox TanStack + Clerk + Convex starter
 
-A small production-shaped web app template for sites created by iChef. It includes:
+A small production-shaped web app template for sites created by BuddyBox. It includes:
 
 - TanStack Start with file-based routing and SSR
 - Clerk request middleware, hosted sign-in/sign-up components, and a server-protected route
@@ -20,7 +20,7 @@ bun install
 cp .env.example .env.local
 ```
 
-iChef should then replace the product name and copy while preserving the authentication and ownership checks. Never copy a user's credentials into source files or generated Git history.
+BuddyBox should then replace the product name and copy while preserving the authentication and ownership checks. Never copy a user's credentials into source files or generated Git history.
 
 ## Configure Clerk and Convex
 
@@ -65,7 +65,7 @@ bun run start
 - `convex/projects.ts` independently calls `ctx.auth.getUserIdentity()` on every data operation. A protected page is not a substitute for backend authorization.
 - Projects are read through `by_owner_token_identifier`; no table scan or cross-user lookup is exposed.
 - Only `VITE_CLERK_PUBLISHABLE_KEY` and `VITE_CONVEX_URL` enter the browser bundle. `CLERK_SECRET_KEY` must remain server-only.
-- `.env.local`, build output, and dependencies are ignored. iChef should run a secret scan before committing a generated repository.
+- `.env.local`, build output, and dependencies are ignored. BuddyBox should run a secret scan before committing a generated repository.
 - Convex functions use validated arguments and return values. Keep those validators when extending the API.
 
 ## Template extension points

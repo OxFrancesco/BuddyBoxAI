@@ -14,6 +14,6 @@ folder to gather information, feedback, patterns, and templates before writing c
 - `resources/convex-agent` — Official Convex Agent component for durable threads, messages, streaming, tools, workflows, and usage tracking
 - `resources/flue` — Official Flue framework — runtime, channel/database/sandbox connectors, blueprints, tooling, and examples
 - `resources/flue-codex` — Francesco's FLUE provider bridge for using each user's Codex subscription through Pi's native OpenAI Codex transport
-- `resources/cloudflare-sandbox-sdk` — Official Cloudflare Sandbox SDK source, current API types, lifecycle, tunnels, and examples for iChef runtime proof
+- `resources/cloudflare-sandbox-sdk` — Official Cloudflare Sandbox SDK source, current API types, lifecycle, tunnels, and examples for BuddyBox runtime proof
 
 <!-- codeview:end -->
