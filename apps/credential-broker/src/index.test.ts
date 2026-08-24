@@ -1,12 +1,30 @@
-import { describe, expect, test } from "bun:test";
+import { describe, expect, mock, spyOn, test } from "bun:test";
 import { generateKeyPairSync, verify } from "node:crypto";
 
-import { createCredentialBroker, testables } from "./index";
+mock.module("cloudflare:workers", () => ({
+  WorkerEntrypoint: class {
+    protected env: unknown;
+
+    constructor(_ctx: unknown, env: unknown) {
+      this.env = env;
+    }
+  },
+}));
+
+const { createCredentialBroker, GitHubSigner, testables } = await import("./index");
 
 describe("credential broker boundaries", () => {
   test("accepts only run-scoped authority", () => {
     expect(testables.isRunAuthority({ userId: "u", projectId: "p", action: "run" })).toBe(true);
     expect(testables.isRunAuthority({ userId: "u", projectId: "p", action: "preview" })).toBe(false);
+  });
+
+  test("preserves the legacy iChef run-capability header", () => {
+    const request = new Request("https://broker.example/v1/egress/openai-codex/backend-api/codex/responses", {
+      headers: { "x-ichef-run-capability": "legacy-run-capability" },
+    });
+
+    expect(testables.runCapability(request, "openai-codex")).toBe("legacy-run-capability");
   });
 
   test("extracts the owner account without exposing the token", () => {
@@ -77,6 +95,28 @@ describe("credential broker boundaries", () => {
 });
 
 describe("GitHub egress", () => {
+  test("preserves legacy fetch traffic with the ICHEF broker secret", async () => {
+    const authorizations: Array<string | null> = [];
+    const handler = createCredentialBroker({
+      fetcher: async (_input, init) => {
+        authorizations.push(new Headers(init?.headers).get("authorization"));
+        return Response.json({ ok: true, result: {
+          status: "ok", installationId: 42, repositoryId: 77, repositoryFullName: "octocat/menu",
+        } });
+      },
+    });
+    const response = await handler.fetch(new Request(
+      "https://broker.example/v1/egress/github/octocat/other.git/info/refs?service=git-upload-pack",
+      { headers: { authorization: "Bearer run-capability" } },
+    ), githubEnv({
+      BUDDYBOX_CREDENTIAL_BROKER_SECRET: undefined,
+      ICHEF_CREDENTIAL_BROKER_SECRET: "legacy-broker-secret-at-least-thirty-two-characters",
+    }));
+
+    expect(response.status).toBe(404);
+    expect(authorizations).toEqual(["Bearer legacy-broker-secret-at-least-thirty-two-characters"]);
+  });
+
   test("injects a repository-scoped installation token for Git smart HTTP", async () => {
     const upstream: Array<{ url: string; authorization: string; cookie: string | null }> = [];
     const handler = createCredentialBroker({
@@ -111,7 +151,13 @@ describe("GitHub egress", () => {
     const response = await handler.fetch(new Request(
       "https://broker.example/v1/egress/github/octocat/menu.git/info/refs?service=git-upload-pack",
       { headers: { authorization: "Bearer run-capability", cookie: "sandbox-secret" } },
-    ), githubEnv());
+    ), githubEnv({
+      GITHUB_SIGNER: {
+        mintInstallationToken: async () => {
+          throw new Error("RPC signer must not run when the local private key exists");
+        },
+      },
+    }));
 
     expect(response.status).toBe(200);
     expect(upstream).toEqual([{
@@ -171,9 +217,137 @@ describe("GitHub egress", () => {
     expect(response.status).toBe(502);
     expect(response.headers.get("location")).toBeNull();
   });
+
+  test("falls back to the legacy signer RPC and keeps the token cache in the BuddyBox broker", async () => {
+    const now = 1_800_000_000_000;
+    let signerCalls = 0;
+    let upstreamCalls = 0;
+    const handler = createCredentialBroker({
+      now: () => now,
+      fetcher: async (input) => {
+        const url = String(input);
+        if (url === "https://convex.example/v1/credentials/github") {
+          return Response.json({ ok: true, result: {
+            status: "ok", installationId: 42, repositoryId: 77, repositoryFullName: "octocat/menu",
+          } });
+        }
+        if (url.includes("/access_tokens")) throw new Error("BuddyBox must not mint with a missing private key");
+        upstreamCalls += 1;
+        return new Response("git-response");
+      },
+    });
+    const env = githubEnv({
+      GITHUB_APP_PRIVATE_KEY: undefined,
+      GITHUB_SIGNER: {
+        mintInstallationToken: async (input: unknown) => {
+          signerCalls += 1;
+          expect(input).toEqual({ installationId: 42, repositoryId: 77 });
+          return { token: "ghs_from_legacy_signer", expiresAt: now + 60 * 60_000 };
+        },
+      },
+    });
+
+    for (let request = 0; request < 2; request++) {
+      const response = await handler.fetch(new Request(
+        "https://broker.example/v1/egress/github/octocat/menu.git/info/refs?service=git-upload-pack",
+        { headers: { authorization: "Bearer run-capability" } },
+      ), env);
+      expect(response.status).toBe(200);
+    }
+
+    expect(signerCalls).toBe(1);
+    expect(upstreamCalls).toBe(2);
+  });
+
+  test("fails closed when the signer RPC rejects or returns an invalid credential", async () => {
+    for (const mintInstallationToken of [
+      async () => Promise.reject(new Error("legacy signer unavailable")),
+      async () => ({ token: "not-an-installation-token", expiresAt: 1_800_003_600_000 }),
+      async () => ({ token: "ghs_already_expired", expiresAt: 1_800_000_030_000 }),
+    ]) {
+      let upstreamCalled = false;
+      const handler = createCredentialBroker({
+        now: () => 1_800_000_000_000,
+        fetcher: async (input) => {
+          const url = String(input);
+          if (url === "https://convex.example/v1/credentials/github") {
+            return Response.json({ ok: true, result: {
+              status: "ok", installationId: 42, repositoryId: 77, repositoryFullName: "octocat/menu",
+            } });
+          }
+          upstreamCalled = true;
+          return new Response("unexpected");
+        },
+      });
+      const response = await handler.fetch(new Request(
+        "https://broker.example/v1/egress/github/octocat/menu.git/info/refs?service=git-upload-pack",
+        { headers: { authorization: "Bearer run-capability" } },
+      ), githubEnv({ GITHUB_APP_PRIVATE_KEY: undefined, GITHUB_SIGNER: { mintInstallationToken } }));
+
+      expect(response.status).toBe(503);
+      expect(upstreamCalled).toBe(false);
+    }
+  });
 });
 
-function githubEnv() {
+describe("GitHub signer RPC", () => {
+  test("validates positive safe installation and repository IDs before calling GitHub", async () => {
+    let githubCalled = false;
+    const fetchMock = spyOn(globalThis, "fetch").mockImplementation(fetchImplementation(async () => {
+      githubCalled = true;
+      return Response.json({});
+    }));
+    try {
+      const signer = new GitHubSigner({} as never, githubSignerEnv());
+      for (const input of [
+        { installationId: 0, repositoryId: 77 },
+        { installationId: 42.5, repositoryId: 77 },
+        { installationId: 42, repositoryId: Number.MAX_SAFE_INTEGER + 1 },
+        { installationId: "42", repositoryId: 77 },
+      ]) {
+        await expect(signer.mintInstallationToken(input)).rejects.toThrow("Invalid GitHub installation token request");
+      }
+      expect(githubCalled).toBe(false);
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+
+  test("mints a repository-restricted token and rejects GitHub redirects", async () => {
+    const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+    const env = githubSignerEnv({
+      GITHUB_APP_PRIVATE_KEY: privateKey.export({ type: "pkcs1", format: "pem" }).toString(),
+    });
+    const fetchMock = spyOn(globalThis, "fetch");
+    try {
+      fetchMock.mockImplementation(fetchImplementation(async (_input, init) => {
+        expect(init?.redirect).toBe("manual");
+        expect(JSON.parse(String(init?.body))).toEqual({
+          repository_ids: [77],
+          permissions: { contents: "write", metadata: "read" },
+        });
+        return Response.json({
+          token: "ghs_from_named_signer",
+          expires_at: new Date(Date.now() + 60 * 60_000).toISOString(),
+        });
+      }));
+      const signer = new GitHubSigner({} as never, env);
+      const credential = await signer.mintInstallationToken({ installationId: 42, repositoryId: 77 });
+      expect(credential.token).toBe("ghs_from_named_signer");
+
+      fetchMock.mockImplementation(fetchImplementation(async () => new Response(null, {
+        status: 302,
+        headers: { location: "https://evil.example/collect" },
+      })));
+      await expect(signer.mintInstallationToken({ installationId: 42, repositoryId: 77 }))
+        .rejects.toThrow("GitHub installation token unavailable");
+    } finally {
+      fetchMock.mockRestore();
+    }
+  });
+});
+
+function githubEnv(overrides: Record<string, unknown> = {}) {
   return {
     CONTROL_PLANE: {
       fetch: async () => Response.json({ userId: "user_1", projectId: "project_1", action: "run" }),
@@ -183,5 +357,20 @@ function githubEnv() {
     BUDDYBOX_CREDENTIAL_BROKER_SECRET: "broker-secret-at-least-thirty-two-characters",
     GITHUB_APP_ID: "1234",
     GITHUB_APP_PRIVATE_KEY: "test-private-key",
+    ...overrides,
   } as never;
+}
+
+function githubSignerEnv(overrides: Record<string, unknown> = {}) {
+  return {
+    GITHUB_APP_ID: "1234",
+    GITHUB_APP_PRIVATE_KEY: "test-private-key",
+    ...overrides,
+  } as never;
+}
+
+function fetchImplementation(
+  implementation: (...args: Parameters<typeof fetch>) => ReturnType<typeof fetch>,
+): typeof fetch {
+  return Object.assign(implementation, { preconnect: globalThis.fetch.preconnect });
 }

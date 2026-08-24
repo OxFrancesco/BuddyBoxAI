@@ -1,15 +1,48 @@
+import { WorkerEntrypoint } from "cloudflare:workers";
+
 import {
   GITHUB_RUNTIME_PERMISSIONS,
   resolveGitHubEgressRoute,
 } from "../../../packages/provisioning/src/github-egress";
 
+export interface GitHubSignerEnv {
+  GITHUB_APP_ID: string;
+  GITHUB_APP_PRIVATE_KEY: string;
+}
+
+export type GitHubInstallationToken = { token: string; expiresAt: number };
+
+export class GitHubSigner extends WorkerEntrypoint<GitHubSignerEnv> {
+  async mintInstallationToken(input: unknown): Promise<GitHubInstallationToken> {
+    if (!isGitHubInstallationTokenRequest(input)) {
+      throw new Error("Invalid GitHub installation token request");
+    }
+    try {
+      const credential = await mintGitHubInstallationToken({
+        ...input,
+        appId: this.env.GITHUB_APP_ID,
+        privateKeyPem: this.env.GITHUB_APP_PRIVATE_KEY,
+        fetcher: fetch,
+        now: Date.now(),
+        signAppJwt: createGitHubAppJwt,
+      });
+      if (credential) return credential;
+    } catch {
+      // Normalize crypto and upstream failures without exposing credential material over RPC.
+    }
+    throw new Error("GitHub installation token unavailable");
+  }
+}
+
 export interface Env {
   CONTROL_PLANE: Fetcher;
   CONVEX_CREDENTIAL_URL: string;
   CONVEX_GITHUB_CREDENTIAL_URL: string;
-  BUDDYBOX_CREDENTIAL_BROKER_SECRET: string;
-  GITHUB_APP_ID: string;
-  GITHUB_APP_PRIVATE_KEY: string;
+  BUDDYBOX_CREDENTIAL_BROKER_SECRET?: string;
+  ICHEF_CREDENTIAL_BROKER_SECRET?: string;
+  GITHUB_APP_ID?: string;
+  GITHUB_APP_PRIVATE_KEY?: string;
+  GITHUB_SIGNER?: Service<GitHubSigner>;
 }
 
 const allowed = new Set(["openrouter", "openai-codex", "github"]);
@@ -70,7 +103,7 @@ type BrokerDependencies = {
 };
 export type CredentialBroker = { fetch(request: Request, env: Env): Promise<Response> };
 
-type CachedInstallationToken = { token: string; expiresAt: number };
+type CachedInstallationToken = GitHubInstallationToken;
 
 export function createCredentialBroker(dependencies: BrokerDependencies = {}): CredentialBroker {
   const fetcher = dependencies.fetcher ?? fetch;
@@ -248,51 +281,115 @@ async function installationToken(input: {
   const current = input.installationTokens.get(input.cacheKey);
   if (!input.force && current && current.expiresAt > input.now() + 5 * 60_000) return current.token;
   try {
-    const jwt = await input.signAppJwt({
-      appId: input.env.GITHUB_APP_ID,
-      privateKeyPem: input.env.GITHUB_APP_PRIVATE_KEY,
-      nowSeconds: Math.floor(input.now() / 1_000),
-    });
-    const response = await input.fetcher(
-      `https://api.github.com/app/installations/${input.binding.installationId}/access_tokens`,
-      {
-        method: "POST",
-        headers: {
-          accept: "application/vnd.github+json",
-          authorization: `Bearer ${jwt}`,
-          "content-type": "application/json",
-          "user-agent": "BuddyBox/0.1",
-          "x-github-api-version": GITHUB_API_VERSION,
-        },
-        body: JSON.stringify({
-          repository_ids: [input.binding.repositoryId],
-          permissions: GITHUB_RUNTIME_PERMISSIONS,
-        }),
-        redirect: "manual",
-        signal: AbortSignal.timeout(10_000),
-      },
-    );
-    if (!response.ok || (response.status >= 300 && response.status < 400)) return null;
-    const value = await response.json<unknown>();
-    if (!value || typeof value !== "object" || !("token" in value) || typeof value.token !== "string" ||
-      !value.token.startsWith("ghs_") || value.token.length > 4_096 ||
-      !("expires_at" in value) || typeof value.expires_at !== "string") return null;
-    const expiresAt = Date.parse(value.expires_at);
-    if (!Number.isFinite(expiresAt) || expiresAt <= input.now() + 60_000 || expiresAt > input.now() + 65 * 60_000) return null;
+    let credential: CachedInstallationToken | null = null;
+    if (input.env.GITHUB_APP_PRIVATE_KEY) {
+      if (!input.env.GITHUB_APP_ID) return null;
+      credential = await mintGitHubInstallationToken({
+        installationId: input.binding.installationId,
+        repositoryId: input.binding.repositoryId,
+        appId: input.env.GITHUB_APP_ID,
+        privateKeyPem: input.env.GITHUB_APP_PRIVATE_KEY,
+        fetcher: input.fetcher,
+        now: input.now(),
+        signAppJwt: input.signAppJwt,
+      });
+    } else if (input.env.GITHUB_SIGNER) {
+      const value = await input.env.GITHUB_SIGNER.mintInstallationToken({
+        installationId: input.binding.installationId,
+        repositoryId: input.binding.repositoryId,
+      });
+      credential = installationTokenFromRpc(value, input.now());
+    }
+    if (!credential) return null;
     pruneTokenCache(input.installationTokens, input.now());
-    input.installationTokens.set(input.cacheKey, { token: value.token, expiresAt });
-    return value.token;
+    input.installationTokens.set(input.cacheKey, credential);
+    return credential.token;
   } catch {
     return null;
   }
 }
 
+async function mintGitHubInstallationToken(input: {
+  installationId: number;
+  repositoryId: number;
+  appId: string;
+  privateKeyPem: string;
+  fetcher: FetcherFunction;
+  now: number;
+  signAppJwt: SignAppJwt;
+}): Promise<CachedInstallationToken | null> {
+  if (!isPositiveSafeInteger(input.installationId) || !isPositiveSafeInteger(input.repositoryId) ||
+    !isPositiveSafeIntegerString(input.appId)) return null;
+  const jwt = await input.signAppJwt({
+    appId: input.appId,
+    privateKeyPem: input.privateKeyPem,
+    nowSeconds: Math.floor(input.now / 1_000),
+  });
+  const response = await input.fetcher(
+    `https://api.github.com/app/installations/${input.installationId}/access_tokens`,
+    {
+      method: "POST",
+      headers: {
+        accept: "application/vnd.github+json",
+        authorization: `Bearer ${jwt}`,
+        "content-type": "application/json",
+        "user-agent": "BuddyBox/0.1",
+        "x-github-api-version": GITHUB_API_VERSION,
+      },
+      body: JSON.stringify({
+        repository_ids: [input.repositoryId],
+        permissions: GITHUB_RUNTIME_PERMISSIONS,
+      }),
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+  if (response.status >= 300 && response.status < 400) return null;
+  if (!response.ok) return null;
+  return installationTokenFromGitHub(await response.json<unknown>(), input.now);
+}
+
+function isGitHubInstallationTokenRequest(value: unknown): value is { installationId: number; repositoryId: number } {
+  return Boolean(value && typeof value === "object" &&
+    "installationId" in value && isPositiveSafeInteger(value.installationId) &&
+    "repositoryId" in value && isPositiveSafeInteger(value.repositoryId));
+}
+
+function isPositiveSafeInteger(value: unknown): value is number {
+  return typeof value === "number" && Number.isSafeInteger(value) && value > 0;
+}
+
+function isPositiveSafeIntegerString(value: string): boolean {
+  if (!/^[1-9]\d*$/.test(value)) return false;
+  return Number.isSafeInteger(Number(value));
+}
+
+function installationTokenFromGitHub(value: unknown, now: number): CachedInstallationToken | null {
+  if (!value || typeof value !== "object" || !("token" in value) || typeof value.token !== "string" ||
+    !("expires_at" in value) || typeof value.expires_at !== "string") return null;
+  return validatedInstallationToken(value.token, Date.parse(value.expires_at), now);
+}
+
+function installationTokenFromRpc(value: unknown, now: number): CachedInstallationToken | null {
+  if (!value || typeof value !== "object" || !("token" in value) || typeof value.token !== "string" ||
+    !("expiresAt" in value) || typeof value.expiresAt !== "number") return null;
+  return validatedInstallationToken(value.token, value.expiresAt, now);
+}
+
+function validatedInstallationToken(token: string, expiresAt: number, now: number): CachedInstallationToken | null {
+  if (!token.startsWith("ghs_") || token.length <= 4 || token.length > 4_096 ||
+    !Number.isFinite(expiresAt) || expiresAt <= now + 60_000 || expiresAt > now + 65 * 60_000) return null;
+  return { token, expiresAt };
+}
+
 async function resolveCodexCredential(env: Env, userId: string, fetcher: FetcherFunction): Promise<CredentialResult> {
   try {
+    const secret = credentialBrokerSecret(env);
+    if (!secret) return { status: "unavailable" };
     const response = await fetcher(env.CONVEX_CREDENTIAL_URL, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${env.BUDDYBOX_CREDENTIAL_BROKER_SECRET}`,
+        authorization: `Bearer ${secret}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({ ownerId: userId }),
@@ -313,10 +410,12 @@ async function resolveCodexCredential(env: Env, userId: string, fetcher: Fetcher
 
 async function resolveGitHubBinding(env: Env, userId: string, projectId: string, fetcher: FetcherFunction): Promise<GitHubBindingResult> {
   try {
+    const secret = credentialBrokerSecret(env);
+    if (!secret) return { status: "unavailable" };
     const response = await fetcher(env.CONVEX_GITHUB_CREDENTIAL_URL, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${env.BUDDYBOX_CREDENTIAL_BROKER_SECRET}`,
+        authorization: `Bearer ${secret}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({ ownerId: userId, projectId }),
@@ -345,6 +444,11 @@ async function resolveGitHubBinding(env: Env, userId: string, projectId: string,
   }
 }
 
+function credentialBrokerSecret(env: Env): string | null {
+  const secret = env.BUDDYBOX_CREDENTIAL_BROKER_SECRET ?? env.ICHEF_CREDENTIAL_BROKER_SECRET;
+  return typeof secret === "string" && secret.length > 0 ? secret : null;
+}
+
 type ParsedBrokerResult = { ok: true; value: Record<string, unknown> } | { ok: false; status: string };
 
 async function brokerResult(response: Response, allowedStatuses: readonly string[]): Promise<ParsedBrokerResult> {
@@ -359,7 +463,8 @@ async function brokerResult(response: Response, allowedStatuses: readonly string
 }
 
 function runCapability(request: Request, provider: string): string | null {
-  let capability = request.headers.get("x-buddybox-run-capability");
+  let capability = request.headers.get("x-buddybox-run-capability") ||
+    request.headers.get("x-ichef-run-capability");
   if (!capability && provider === "github") {
     const authorization = request.headers.get("authorization") ?? "";
     capability = authorization.startsWith("Bearer ") ? authorization.slice(7) : null;

@@ -32,11 +32,8 @@ async function main(): Promise<void> {
   await tokens.initialize();
   const api = new XApiClient({ baseUrl: config.apiBaseUrl, tokens });
   const engine = await XChatEngine.create({
-    juiceboxConfig: config.juiceboxConfig,
     juiceboxPin: config.juiceboxPin,
-    realmTokens: config.realmTokens,
     botUserId: config.botUserId,
-    keyVersion: config.botKeyVersion,
     api,
     vault,
   });

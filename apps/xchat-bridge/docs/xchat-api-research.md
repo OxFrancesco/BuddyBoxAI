@@ -1,6 +1,7 @@
 # X Chat API implementation notes
 
-Primary-source review performed 2026-08-14.
+Primary-source review performed 2026-08-14 and refreshed 2026-08-24 against
+the official Chat XDK and xurl recovery implementations.
 
 - X Chat transports encrypted, signed message events. The Chat XDK is the
   supported encryption/decryption/signature layer, while X API routes carry
@@ -27,12 +28,20 @@ Primary-source review performed 2026-08-14.
   come from the public-key API, not an untrusted event, and their identity-key
   bindings should be verified. Only a verified text event may become agent
   input. [Chat XDK](https://docs.x.com/xchat/xchat-xdk)
+- `GET /2/users/{id}/public_keys` returns every public-key field, including
+  `juicebox_config`; the official xurl and Chat XDK examples intentionally send
+  no `public_key.fields` query parameter.
 - Bot/server private material may use a protected key blob or secure key
   backup. PINs, private keys, unwrapped conversation keys, OAuth tokens, and
   plaintext must never enter logs. OAuth revocation does not revoke private
   keys already obtained. [Private-key guidance](https://docs.x.com/xchat/handling-private-keys)
 
-The bridge uses the official JavaScript Chat XDK secure-backup path. The bot's
-PIN and Juicebox realm authorization are deployment secrets, not end-user
-credentials. Verified conversation keys, OAuth refresh state, and prepared
-outbound ciphertext are encrypted again in a persistent local vault.
+The bridge uses the official JavaScript Chat XDK secure-backup path. At each
+startup it fetches the bot's current public-key records, selects the newest
+record carrying `juicebox_config`, and derives the realm authorization map
+only from that response's `token_map`. After PIN recovery it matches the
+recovered identity public key against the account's registered keys and adopts
+that record's version. The PIN remains a deployment secret; Juicebox config,
+realm tokens, and key version are not static deployment inputs. Verified
+conversation keys, OAuth refresh state, and prepared outbound ciphertext are
+encrypted again in a persistent local vault.

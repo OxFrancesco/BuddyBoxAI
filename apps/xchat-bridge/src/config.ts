@@ -2,10 +2,7 @@ export interface BridgeConfig {
   port: number;
   consumerSecret: string;
   botUserId: string;
-  botKeyVersion: string;
-  juiceboxConfig: string;
   juiceboxPin: string;
-  realmTokens: Readonly<Record<string, string>>;
   accessToken: string;
   refreshToken?: string;
   oauthClientId?: string;
@@ -29,7 +26,6 @@ export function readConfig(env: Record<string, string | undefined> = process.env
   const apiBaseUrl = secureUrl(optional(env.X_API_BASE_URL) ?? "https://api.x.com");
   const brokerUrl = secureUrl(required(env, "CONVEX_XCHAT_BROKER_URL"));
   const portalUrl = secureUrl(optional(env.PUBLIC_PORTAL_URL) ?? "https://buddybox.buddytools.org");
-  const realmTokens = parseSecretMap(required(env, "X_CHAT_REALM_TOKENS_JSON"));
   const routeEncryptionKey = required(env, "BUDDYBOX_ROUTE_ENCRYPTION_KEY");
   const vaultEncryptionKey = required(env, "XCHAT_VAULT_ENCRYPTION_KEY");
   if (decodeBase64(routeEncryptionKey).byteLength !== 32 || decodeBase64(vaultEncryptionKey).byteLength !== 32) {
@@ -45,10 +41,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     port: integer(env.PORT, 3000, 1, 65_535),
     consumerSecret,
     botUserId: snowflake(required(env, "X_CHAT_USER_ID")),
-    botKeyVersion: required(env, "X_CHAT_KEY_VERSION"),
-    juiceboxConfig: parseJsonObject(required(env, "X_CHAT_JUICEBOX_CONFIG")),
     juiceboxPin: required(env, "X_CHAT_PIN"),
-    realmTokens,
     accessToken: required(env, "X_OAUTH_ACCESS_TOKEN"),
     ...(refreshToken ? { refreshToken } : {}),
     ...(oauthClientId ? { oauthClientId } : {}),
@@ -95,24 +88,6 @@ function secureUrl(value: string): string {
 function snowflake(value: string): string {
   if (!/^\d{1,19}$/.test(value)) throw new Error("X_CHAT_USER_ID must be an X user ID");
   return value;
-}
-
-function parseJsonObject(value: string): string {
-  const parsed: unknown = JSON.parse(value);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Expected a JSON object");
-  return JSON.stringify(parsed);
-}
-
-function parseSecretMap(value: string): Readonly<Record<string, string>> {
-  const parsed: unknown = JSON.parse(value);
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error("Expected a realm-token JSON object");
-  const result: Record<string, string> = {};
-  for (const [realm, token] of Object.entries(parsed)) {
-    if (!/^[0-9a-f]+$/i.test(realm) || typeof token !== "string" || token.length < 1) throw new Error("Invalid realm-token entry");
-    result[realm.toLowerCase()] = token;
-  }
-  if (!Object.keys(result).length) throw new Error("At least one realm token is required");
-  return result;
 }
 
 function decodeBase64(value: string): Uint8Array {
