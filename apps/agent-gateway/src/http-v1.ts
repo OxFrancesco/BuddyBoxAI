@@ -225,7 +225,7 @@ export function createV1Handler(dependencies: GatewayDependencies): V1Handler {
             headers: {
               "content-type": "application/x-ndjson; charset=utf-8",
               "cache-control": "no-store",
-              "x-ichef-protocol-version": RUNTIME_PROTOCOL_VERSION,
+              "x-buddybox-protocol-version": RUNTIME_PROTOCOL_VERSION,
             },
           });
         }
@@ -313,7 +313,7 @@ export function createV1Handler(dependencies: GatewayDependencies): V1Handler {
             headers: {
               "content-type": screenshot.mediaType,
               "cache-control": "no-store",
-              "x-ichef-protocol-version": RUNTIME_PROTOCOL_VERSION,
+              "x-buddybox-protocol-version": RUNTIME_PROTOCOL_VERSION,
             },
           });
         }
@@ -328,7 +328,7 @@ export function createV1Handler(dependencies: GatewayDependencies): V1Handler {
               "content-type": artifact.mediaType,
               "cache-control": "private, no-store",
               "x-content-type-options": "nosniff",
-              "x-ichef-protocol-version": RUNTIME_PROTOCOL_VERSION,
+              "x-buddybox-protocol-version": RUNTIME_PROTOCOL_VERSION,
             },
           });
         }

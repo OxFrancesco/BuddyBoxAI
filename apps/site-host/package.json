@@ -1,5 +1,5 @@
 {
-  "name": "@ichef/site-host",
+  "name": "@buddybox/site-host",
   "private": true,
   "type": "module",
   "scripts": {

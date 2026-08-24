@@ -56,15 +56,15 @@ export async function pkceChallenge(verifier: string): Promise<string> {
 }
 
 function associatedData(ownerId: string, provider: OAuthProvider, purpose: string): string {
-  return `ichef:provider-oauth:v1:${ownerId}:${provider}:${purpose}`;
+  return `buddybox:provider-oauth:v1:${ownerId}:${provider}:${purpose}`;
 }
 
 async function providerKey(usages: KeyUsage[]): Promise<CryptoKey> {
-  const encoded = process.env.ICHEF_PROVIDER_CREDENTIAL_KEY;
-  if (!encoded) throw new Error("ICHEF_PROVIDER_CREDENTIAL_KEY is not configured");
+  const encoded = process.env.BUDDYBOX_PROVIDER_CREDENTIAL_KEY;
+  if (!encoded) throw new Error("BUDDYBOX_PROVIDER_CREDENTIAL_KEY is not configured");
   const bytes = fromBase64(encoded);
   if (bytes.byteLength !== 32) {
-    throw new Error("ICHEF_PROVIDER_CREDENTIAL_KEY must decode to exactly 32 bytes");
+    throw new Error("BUDDYBOX_PROVIDER_CREDENTIAL_KEY must decode to exactly 32 bytes");
   }
   return await crypto.subtle.importKey(
     "raw",

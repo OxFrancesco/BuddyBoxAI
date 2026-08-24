@@ -1,4 +1,4 @@
-# iChef Convex control plane
+# BuddyBox Convex control plane
 
 ## Operator configuration
 
@@ -9,17 +9,17 @@
 - `GITHUB_APP_CLIENT_ID`, `GITHUB_APP_CLIENT_SECRET`, and `GITHUB_APP_ID`
   authenticate and verify the App authorization callback. This connection is
   for repository access only and is independent from Clerk sign-in.
-- `ICHEF_SITES_BASE_DOMAIN` is the iChef-owned hosting suffix and defaults to
-  `ichef-sites.buddytools.org`; project hosts append it inside a first-level DNS label.
-- `ICHEF_SITE_HOST_SECRET` authenticates the private site-host broker. Use a
+- `BUDDYBOX_SITES_BASE_DOMAIN` is the BuddyBox-owned hosting suffix and defaults to
+  `buddybox-sites.buddytools.org`; project hosts append it inside a first-level DNS label.
+- `BUDDYBOX_SITE_HOST_SECRET` authenticates the private site-host broker. Use a
   distinct random value of at least 32 characters and never expose it to users.
-- `ICHEF_ORCHESTRATOR_SECRET` authenticates Convex actions to the private
+- `BUDDYBOX_ORCHESTRATOR_SECRET` authenticates Convex actions to the private
   capability-issuing control-plane route. Configure the exact same random value
-  as a secret on `ichef-control-plane`; never expose it to a browser or Sandbox.
-- `ICHEF_ORCHESTRATOR_URL` is optional and defaults to
-  `https://ichef.buddytools.org/v1/orchestration/runs`.
+  as a secret on `buddybox-control-plane`; never expose it to a browser or Sandbox.
+- `BUDDYBOX_ORCHESTRATOR_URL` is optional and defaults to
+  `https://buddybox.buddytools.org/v1/orchestration/runs`.
 
-This directory is the durable, multi-User control plane for iChef. Convex owns
+This directory is the durable, multi-User control plane for BuddyBox. Convex owns
 identity bindings, connections, Projects, Conversations, Runs, sanitized Run
 events, runtime leases, Previews, action-bound Approvals, Releases, delivery
 receipts, quotas, audit history, retention, and resumable account deletion.

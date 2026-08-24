@@ -1,12 +1,12 @@
-# iChef managed site host
+# BuddyBox managed site host
 
-`ichef-site-host` serves generated static TanStack frontends from one iChef-owned
+`buddybox-site-host` serves generated static TanStack frontends from one BuddyBox-owned
 R2 bucket. Users never receive a Cloudflare credential and sandboxed agents never
 call the Cloudflare API. Every public site is isolated by hostname and immutable
 release prefix:
 
 ```text
-https://<project-slug>-<stable-project-suffix>-ichef-sites.buddytools.org
+https://<project-slug>-<stable-project-suffix>-buddybox-sites.buddytools.org
 releases/<projectId>/<releaseId>/<manifestDigest>/<assetPath>
 ```
 
@@ -25,7 +25,7 @@ short-lived `deploy` capability in `Authorization: Bearer ...` and this body:
   "releaseId": "...",
   "sourceRunId": "...",
   "commitSha": "0123456789abcdef",
-  "hostname": "my-site-project-id-ichef-sites.buddytools.org",
+  "hostname": "my-site-project-id-buddybox-sites.buddytools.org",
   "artifactManifestDigest": "64-lowercase-hex-characters",
   "assets": [
     {
@@ -64,7 +64,7 @@ manifest prefixes later.
 ## Convex broker contract
 
 All calls are `POST $CONVEX_SITE_HOST_URL` with the secret
-`ICHEF_SITE_HOST_SECRET` and `{ "operation": "...", "input": { ... } }`.
+`BUDDYBOX_SITE_HOST_SECRET` and `{ "operation": "...", "input": { ... } }`.
 Responses use `{ "ok": true, "result": ... }`.
 
 - `reserve_upload`: input
@@ -86,18 +86,18 @@ tenant registry.
 One-time operator steps (do not run from an agent sandbox):
 
 ```sh
-bunx wrangler r2 bucket create ichef-sites
-bunx wrangler secret put ICHEF_SITE_HOST_SECRET --config apps/site-host/wrangler.jsonc
+bunx wrangler r2 bucket create buddybox-sites
+bunx wrangler secret put BUDDYBOX_SITE_HOST_SECRET --config apps/site-host/wrangler.jsonc
 bunx wrangler deploy --config apps/site-host/wrangler.jsonc
 ```
 
 The zone already has a proxied `*.buddytools.org` DNS record. Keep the scoped
-`*-ichef-sites.buddytools.org/*` Worker route from `wrangler.jsonc`; this first-level
+`*-buddybox-sites.buddytools.org/*` Worker route from `wrangler.jsonc`; this first-level
 hostname shape is covered by Universal SSL without a paid nested-wildcard certificate. The `CONTROL_PLANE` service must
 already exist. The Agent Gateway still needs this binding:
 
 ```jsonc
-{ "binding": "SITE_HOST", "service": "ichef-site-host" }
+{ "binding": "SITE_HOST", "service": "buddybox-site-host" }
 ```
 
 Do not expose `site-host.internal` in DNS. The management endpoint only accepts

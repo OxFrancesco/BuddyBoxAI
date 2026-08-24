@@ -44,7 +44,7 @@ function ConnectImessage() {
   return (
     <main className="connect-page">
       <header className="connect-nav">
-        <Link className="brand" to="/"><BrandMark /><span>iChef</span></Link>
+        <Link className="brand" to="/"><BrandMark /><span>BuddyBox</span></Link>
         <span><ShieldCheck size={14} /> Clerk-bound verification</span>
       </header>
       <section className="connect-card">
@@ -53,19 +53,19 @@ function ConnectImessage() {
         <h1>Prove the conversation is yours.</h1>
         {!claim ? (
           <div className="connect-notice is-warning">
-            Start by messaging the iChef Spectrum line. Its reply contains a private, 15-minute connection link.
+            Start by messaging the BuddyBox Spectrum line. Its reply contains a private, 15-minute connection link.
           </div>
         ) : result ? (
           <div className="challenge-result">
             <span>Reply in the same iMessage conversation with exactly</span>
             <button
               type="button"
-              onClick={() => void navigator.clipboard.writeText(`ICHEF-${result.challengeCode}`)}
+              onClick={() => void navigator.clipboard.writeText(`BUDDYBOX-${result.challengeCode}`)}
             >
-              ICHEF-{result.challengeCode} <Copy size={16} />
+              BUDDYBOX-{result.challengeCode} <Copy size={16} />
             </button>
             <small>This one-use code expires at {new Date(result.expiresAt).toLocaleTimeString()}.</small>
-            <p><Check size={16} /> Keep this page open until iChef confirms the connection in Messages.</p>
+            <p><Check size={16} /> Keep this page open until BuddyBox confirms the connection in Messages.</p>
           </div>
         ) : (
           <>
@@ -84,7 +84,7 @@ function ConnectImessage() {
               </Button>
             </Show>
             {status === "failed" ? (
-              <div className="connect-notice is-error">This link is invalid, expired, or already used. Ask iChef for a new one.</div>
+              <div className="connect-notice is-error">This link is invalid, expired, or already used. Ask BuddyBox for a new one.</div>
             ) : null}
           </>
         )}

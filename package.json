@@ -1,5 +1,5 @@
 {
-  "name": "ichef",
+  "name": "buddybox",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -44,7 +44,7 @@
     "deploy:site-host": "bun run --cwd apps/site-host deploy"
   },
   "dependencies": {
-    "@ichef/codex-connection": "workspace:*",
+    "@buddybox/codex-connection": "workspace:*",
     "convex": "^1.43.0"
   },
   "overrides": {

@@ -1,5 +1,5 @@
 {
-  "name": "@ichef/prototype-pi-sandbox-runtime",
+  "name": "@buddybox/prototype-pi-sandbox-runtime",
   "private": true,
   "type": "module",
   "scripts": {

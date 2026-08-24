@@ -19,7 +19,7 @@ const modules = {
 
 const identity = {
   subject: "xchat-user",
-  tokenIdentifier: "https://issuer.ichef.test|xchat-user",
+  tokenIdentifier: "https://issuer.buddybox.test|xchat-user",
 };
 
 async function userFixture(t: ReturnType<typeof convexTest>) {

@@ -309,7 +309,7 @@ function normalizedProjectSlug(value: string): string {
 }
 
 function sitesBaseDomain(): string {
-  const domain = (process.env.ICHEF_SITES_BASE_DOMAIN ?? "ichef-sites.buddytools.org")
+  const domain = (process.env.BUDDYBOX_SITES_BASE_DOMAIN ?? "buddybox-sites.buddytools.org")
     .trim()
     .toLowerCase()
     .replace(/\.$/, "");
@@ -337,7 +337,7 @@ function managedHostingHostname(
       message: "Project ID cannot be encoded as a hosting hostname",
     });
   }
-  const siteLabel = sitesBaseDomain().split(".")[0] ?? "ichef-sites";
+  const siteLabel = sitesBaseDomain().split(".")[0] ?? "buddybox-sites";
   const prefixLength = 63 - suffix.length - siteLabel.length - 2;
   const prefix = slug.slice(0, prefixLength).replace(/-+$/, "") || "site";
   return `${prefix}-${suffix}-${sitesBaseDomain()}`;

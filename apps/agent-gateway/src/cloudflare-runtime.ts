@@ -6,7 +6,7 @@ import type { RuntimeHandle, RuntimeLocator } from "./runtime";
 
 const runnerPort = 8790;
 const workspace = "/workspace";
-const archive = "/tmp/ichef-checkpoint.tgz";
+const archive = "/tmp/buddybox-checkpoint.tgz";
 
 type Client = ReturnType<typeof getSandbox>;
 
@@ -42,10 +42,10 @@ function mediaType(path: string): string {
 }
 
 async function ensureRunner(sandbox: Client): Promise<void> {
-  const existing = (await sandbox.listProcesses()).find((process) => process.id === "ichef-agent-runner");
+  const existing = (await sandbox.listProcesses()).find((process) => process.id === "buddybox-agent-runner");
   if (existing?.status !== "running" && existing?.status !== "starting") {
-    const process = await sandbox.startProcess("bun /opt/ichef-agent-runner/src/server.ts", {
-      processId: "ichef-agent-runner",
+    const process = await sandbox.startProcess("bun /opt/buddybox-agent-runner/src/server.ts", {
+      processId: "buddybox-agent-runner",
       cwd: workspace,
       autoCleanup: false,
     });
@@ -86,7 +86,7 @@ export function cloudflareRuntime(env: Env, locator: RuntimeLocator): RuntimeHan
     sleepAfter: "10m",
     normalizeId: true,
     labels: {
-      workload: "ichef-agent",
+      workload: "buddybox-agent",
       project: locator.projectId,
       generation: String(locator.sandboxGeneration),
     },
@@ -189,7 +189,7 @@ export function cloudflareRuntime(env: Env, locator: RuntimeLocator): RuntimeHan
       if (!restored.success) throw new GatewayError("checkpoint_failed", "Checkpoint restore failed.", 500, true);
       const commitSha = restored.stdout.trim().split("\n").at(-1) ?? "";
       if (!/^[a-f0-9]{40}$/i.test(commitSha)) throw new GatewayError("checkpoint_failed", "Restored Git state is invalid.", 500);
-      const sessions = await sandbox.exec(`find ${workspace}/.ichef/pi-sessions -type f -name '*.jsonl' 2>/dev/null | wc -l`);
+      const sessions = await sandbox.exec(`find ${workspace}/.buddybox/pi-sessions -type f -name '*.jsonl' 2>/dev/null | wc -l`);
       return { commitSha, sessionCount: Number(sessions.stdout.trim() || "0") };
     },
 

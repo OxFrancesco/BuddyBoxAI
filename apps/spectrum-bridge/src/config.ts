@@ -21,8 +21,8 @@ export function readConfig(env: Record<string, string | undefined> = process.env
 
   const port = parsePort(env.PORT);
   const projectSecret = required(env, "SPECTRUM_PROJECT_SECRET");
-  const addressPepper = required(env, "ICHEF_ADDRESS_PEPPER");
-  const internalSecret = required(env, "ICHEF_BRIDGE_SECRET");
+  const addressPepper = required(env, "BUDDYBOX_ADDRESS_PEPPER");
+  const internalSecret = required(env, "BUDDYBOX_BRIDGE_SECRET");
   if (projectSecret.length < 16 || addressPepper.length < 16 || internalSecret.length < 16) {
     throw new Error("Bridge secrets must be at least 16 characters");
   }

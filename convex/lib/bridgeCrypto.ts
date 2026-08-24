@@ -73,10 +73,10 @@ export async function decryptRouteEnvelope<T>(
 }
 
 async function routeEncryptionKey(usages: KeyUsage[]): Promise<CryptoKey> {
-  const encodedKey = process.env.ICHEF_ROUTE_ENCRYPTION_KEY;
-  if (!encodedKey) throw new Error("ICHEF_ROUTE_ENCRYPTION_KEY is not configured");
+  const encodedKey = process.env.BUDDYBOX_ROUTE_ENCRYPTION_KEY;
+  if (!encodedKey) throw new Error("BUDDYBOX_ROUTE_ENCRYPTION_KEY is not configured");
   const rawKey = base64ToBytes(encodedKey);
-  if (rawKey.byteLength !== 32) throw new Error("ICHEF_ROUTE_ENCRYPTION_KEY must decode to 32 bytes");
+  if (rawKey.byteLength !== 32) throw new Error("BUDDYBOX_ROUTE_ENCRYPTION_KEY must decode to 32 bytes");
   const keyBytes = rawKey.slice().buffer as ArrayBuffer;
   return await crypto.subtle.importKey("raw", keyBytes, "AES-GCM", false, usages);
 }

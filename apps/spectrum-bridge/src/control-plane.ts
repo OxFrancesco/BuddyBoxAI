@@ -48,7 +48,7 @@ export class ControlPlaneUnavailableError extends Error {
   readonly code = "control_plane_unavailable";
 
   constructor(readonly status?: number) {
-    super("The iChef control plane is unavailable");
+    super("The BuddyBox control plane is unavailable");
     this.name = "ControlPlaneUnavailableError";
   }
 }
@@ -104,7 +104,7 @@ export class ConvexHttpControlPlane implements ControlPlane {
         headers: {
           authorization: `Bearer ${this.#secret}`,
           "content-type": "application/json",
-          "user-agent": "ichef-spectrum-bridge/0.1",
+          "user-agent": "buddybox-spectrum-bridge/0.1",
         },
         body: JSON.stringify({ operation, input }),
         signal: AbortSignal.timeout(this.#timeoutMs),

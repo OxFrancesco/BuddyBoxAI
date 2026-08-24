@@ -1,6 +1,6 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "ichef-credential-broker",
+  "name": "buddybox-credential-broker",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-13",
   "workers_dev": false,
@@ -8,6 +8,6 @@
     "CONVEX_CREDENTIAL_URL": "https://wry-meerkat-833.convex.site/v1/credentials/codex",
     "CONVEX_GITHUB_CREDENTIAL_URL": "https://wry-meerkat-833.convex.site/v1/credentials/github"
   },
-  "services": [{ "binding": "CONTROL_PLANE", "service": "ichef-control-plane" }],
+  "services": [{ "binding": "CONTROL_PLANE", "service": "buddybox-control-plane" }],
   "observability": { "enabled": true }
 }

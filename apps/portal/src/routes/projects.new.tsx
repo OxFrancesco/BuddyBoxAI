@@ -82,7 +82,7 @@ function NewProject() {
       setStatus("submitted");
     } catch {
       setErrors({
-        form: "iChef could not save this proposal. Check that every setup step is connected, then try again.",
+        form: "BuddyBox could not save this proposal. Check that every setup step is connected, then try again.",
       });
       setStatus("idle");
     }
@@ -99,7 +99,7 @@ function NewProject() {
       });
       setStatus("started");
     } catch {
-      setErrors({ form: "iChef could not start provisioning. Reconnect any expired service and try again." });
+      setErrors({ form: "BuddyBox could not start provisioning. Reconnect any expired service and try again." });
       setStatus("submitted");
     }
   };
@@ -108,7 +108,7 @@ function NewProject() {
     <main className="proposal-page">
       <div className="proposal-ambient" />
       <header className="connect-nav proposal-nav">
-        <Link className="brand" to="/"><BrandMark /><span>iChef</span><em>technical preview</em></Link>
+        <Link className="brand" to="/"><BrandMark /><span>BuddyBox</span><em>technical preview</em></Link>
         <span><ShieldCheck size={14} /> Clerk-authenticated proposal</span>
       </header>
 
@@ -126,7 +126,7 @@ function NewProject() {
           <div className="proposal-ledger" aria-label="What happens next">
             <div><span>01</span><strong>Draft</strong><small>Name the product and describe its first useful version.</small></div>
             <div><span>02</span><strong>Confirm</strong><small>Once delivery is configured, approve the bound plan from verified iMessage or X Chat.</small></div>
-            <div><span>03</span><strong>Provision</strong><small>Only then can iChef create source, backend, and a managed site.</small></div>
+            <div><span>03</span><strong>Provision</strong><small>Only then can BuddyBox create source, backend, and a managed site.</small></div>
           </div>
         </div>
 
@@ -137,7 +137,7 @@ function NewProject() {
               <p className="eyebrow">{status === "started" ? "Provisioning queued" : "Awaiting approval"}</p>
               <h2>{submitted.name} is on the pass.</h2>
               {status === "started" ? (
-                <p>The bound plan is approved. iChef is creating the repository and starting the first verified sandbox Run.</p>
+                <p>The bound plan is approved. BuddyBox is creating the repository and starting the first verified sandbox Run.</p>
               ) : (
                 <p>
                   Approve here, or reply <strong>APPROVE {submitted.bindingHash.slice(0, 8).toUpperCase()}</strong> from your verified iMessage or X Chat. The proposal expires {new Date(submitted.expiresAt).toLocaleString()}.

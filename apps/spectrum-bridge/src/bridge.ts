@@ -10,7 +10,7 @@ import type {
 
 const DEFAULT_MAX_SEND_ATTEMPTS = 3;
 const MAX_OUTBOUND_CHARACTERS = 6_000;
-const CHALLENGE_PATTERN = /^ICHEF[- ]([A-HJ-NP-Z2-9]{6,10})$/i;
+const CHALLENGE_PATTERN = /^BUDDYBOX[- ]([A-HJ-NP-Z2-9]{6,10})$/i;
 
 export interface ControlPlane {
   acceptInbound(message: NormalizedInbound): Promise<InboundResult>;

@@ -34,7 +34,7 @@ export const onboardingSteps: readonly OnboardingStep[] = [
     id: "messaging",
     eyebrow: "Your conversation",
     title: "Choose a messaging channel",
-    detail: "Verify iMessage or X Chat. Either private conversation unlocks the same iChef agent.",
+    detail: "Verify iMessage or X Chat. Either private conversation unlocks the same BuddyBox agent.",
     action: "Choose a channel",
   },
   {
@@ -60,14 +60,14 @@ export const onboardingSteps: readonly OnboardingStep[] = [
   },
 ] as const;
 
-export const managedProjectHostname = "<project>-ichef-sites.buddytools.org";
+export const managedProjectHostname = "<project>-buddybox-sites.buddytools.org";
 
 export const managedHosting = {
   eyebrow: "Included hosting",
-  title: "iChef Cloudflare hosting",
+  title: "BuddyBox Cloudflare hosting",
   detail:
     `No Cloudflare account is required. Each approved site gets a managed ${managedProjectHostname} address.`,
-  action: "Managed by iChef",
+  action: "Managed by BuddyBox",
 } as const;
 
 export function evaluateProjectReadiness(state: OnboardingState) {

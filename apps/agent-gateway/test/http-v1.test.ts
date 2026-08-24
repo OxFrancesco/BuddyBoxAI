@@ -94,7 +94,7 @@ function harness(
         releaseId: "release_one",
         sourceRunId: "run_one",
         commitSha: "0123456789abcdef",
-        hostname: "demo-project-one-ichef-sites.buddytools.org",
+        hostname: "demo-project-one-buddybox-sites.buddytools.org",
         artifactManifestDigest: "7c48613db64ab113a1ac92de092a5a957bd0fac38e19eb328ed130e9df0007ad",
       } : {};
       return { userId, projectId, sandboxGeneration, action, capability: "valid", ...(runId ? { runId } : {}), ...deployBindings, ...authorityOverride } as const;
@@ -151,8 +151,8 @@ describe("v1 gateway HTTP seam", () => {
     const bobHandler = harness("user_bob", locators).handler;
     await bobHandler.fetch(api("/v1/projects/project_same/generations/1/heartbeat"));
     expect(locators).toHaveLength(2);
-    expect(locators[0]?.sandboxId).toMatch(/^ichef-1-[a-f0-9]{24}$/);
-    expect(locators[1]?.sandboxId).toMatch(/^ichef-1-[a-f0-9]{24}$/);
+    expect(locators[0]?.sandboxId).toMatch(/^buddybox-1-[a-f0-9]{24}$/);
+    expect(locators[1]?.sandboxId).toMatch(/^buddybox-1-[a-f0-9]{24}$/);
     expect(locators[0]?.sandboxId).not.toBe(locators[1]?.sandboxId);
   });
 
@@ -389,7 +389,7 @@ describe("v1 gateway HTTP seam", () => {
       body: JSON.stringify({
         releaseId: "release_one",
         commitSha: "0123456789abcdef",
-        hostname: "demo-project-one-ichef-sites.buddytools.org",
+        hostname: "demo-project-one-buddybox-sites.buddytools.org",
         assets: [{ path: "index.html", workspacePath: "dist/index.html", sha256: digest }],
       }),
     }));
@@ -400,7 +400,7 @@ describe("v1 gateway HTTP seam", () => {
       projectId: "project_one",
       releaseId: "release_one",
       deploymentRef: "r2:v1:published",
-      liveUrl: "https://demo-project-one-ichef-sites.buddytools.org",
+      liveUrl: "https://demo-project-one-buddybox-sites.buddytools.org",
     });
     expect(calls).toEqual([
       { operation: "artifact", value: "dist/index.html" },
@@ -412,7 +412,7 @@ describe("v1 gateway HTTP seam", () => {
           releaseId: "release_one",
           sourceRunId: "run_one",
           commitSha: "0123456789abcdef",
-          hostname: "demo-project-one-ichef-sites.buddytools.org",
+          hostname: "demo-project-one-buddybox-sites.buddytools.org",
           artifactManifestDigest: "7c48613db64ab113a1ac92de092a5a957bd0fac38e19eb328ed130e9df0007ad",
           assets: [{ path: "index.html", data: "YXJ0aWZhY3Q=", sha256: digest }],
         },
@@ -431,7 +431,7 @@ describe("v1 gateway HTTP seam", () => {
         body: JSON.stringify({
           releaseId: "release_one",
           commitSha: "0123456789abcdef",
-          hostname: "demo-project-one-ichef-sites.buddytools.org",
+          hostname: "demo-project-one-buddybox-sites.buddytools.org",
           assets: [{
             path: "index.html",
             workspacePath: "dist/index.html",

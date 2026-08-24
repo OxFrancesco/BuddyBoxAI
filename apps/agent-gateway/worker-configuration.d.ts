@@ -4,9 +4,9 @@
 interface __BaseEnv_Env {
 	CHECKPOINTS: R2Bucket;
 	Sandbox: DurableObjectNamespace<import("./src/index").Sandbox>;
-	CONTROL_PLANE: Fetcher /* ichef-control-plane */;
-	CREDENTIAL_BROKER: Fetcher /* ichef-credential-broker */;
-	SITE_HOST: Fetcher /* ichef-site-host */;
+	CONTROL_PLANE: Fetcher /* buddybox-control-plane */;
+	CREDENTIAL_BROKER: Fetcher /* buddybox-credential-broker */;
+	SITE_HOST: Fetcher /* buddybox-site-host */;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {

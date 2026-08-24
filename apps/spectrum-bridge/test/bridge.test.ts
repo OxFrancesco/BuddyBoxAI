@@ -20,7 +20,7 @@ function outbound(overrides: Partial<OutboundMessage> = {}): OutboundMessage {
     outboundId: "delivery-out-1",
     idempotencyKey: "outbound:delivery-out-1",
     spaceId: "opaque-space",
-    text: "Connect your iChef account at https://example.test/connect/token",
+    text: "Connect your BuddyBox account at https://example.test/connect/token",
     ...overrides,
   };
 }
@@ -49,7 +49,7 @@ describe("iMessage bridge seam", () => {
       sleep: async () => undefined,
     });
 
-    await bridge.acceptInbound({ ...inbound, text: "ICHEF-KM7Q2P" });
+    await bridge.acceptInbound({ ...inbound, text: "BUDDYBOX-KM7Q2P" });
     expect(challenge).toBe("KM7Q2P");
   });
 

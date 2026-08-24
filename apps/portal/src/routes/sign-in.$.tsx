@@ -8,9 +8,9 @@ export const Route = createFileRoute("/sign-in/$")({ component: SignInPage });
 function SignInPage() {
   return (
     <main className="auth-page">
-      <a className="brand" href="/" aria-label="iChef home">
+      <a className="brand" href="/" aria-label="BuddyBox home">
         <BrandMark />
-        <span>iChef</span>
+        <span>BuddyBox</span>
       </a>
       <div className="auth-card">
         <p className="eyebrow">Google sign-in · secured by Clerk</p>

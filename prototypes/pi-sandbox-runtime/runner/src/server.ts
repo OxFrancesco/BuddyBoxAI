@@ -14,7 +14,7 @@ import {
 } from "@earendil-works/pi-coding-agent";
 
 const workspace = "/workspace";
-const sessionDirectory = `${workspace}/.ichef/pi-sessions`;
+const sessionDirectory = `${workspace}/.buddybox/pi-sessions`;
 const encoder = new TextEncoder();
 const activeRuns = new Map<string, { abort: () => Promise<void> }>();
 
@@ -80,7 +80,7 @@ async function runPi(
               fauxToolCall("write", {
                 path: "src/generated.ts",
                 content:
-                  'export const headline = "Dinner is served by iChef";\nexport const generatedAt = "prototype";\n',
+                  'export const headline = "Dinner is served by BuddyBox";\nexport const generatedAt = "prototype";\n',
               }),
             ],
             { stopReason: "toolUse" },
@@ -98,7 +98,7 @@ async function runPi(
   const sessionManager = SessionManager.continueRecent(workspace, sessionDirectory);
   const { session } = await createAgentSession({
     cwd: workspace,
-    agentDir: `${workspace}/.ichef/pi-agent`,
+    agentDir: `${workspace}/.buddybox/pi-agent`,
     model,
     modelRuntime,
     thinkingLevel: "off",
@@ -191,4 +191,4 @@ const server = Bun.serve({
   },
 });
 
-console.log(`iChef Pi prototype runner listening on ${server.port}`);
+console.log(`BuddyBox Pi prototype runner listening on ${server.port}`);

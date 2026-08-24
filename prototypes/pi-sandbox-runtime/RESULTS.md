@@ -5,7 +5,7 @@ Date: 2026-08-13
 ## Verdict
 
 The full Pi coding-agent SDK can run inside a Cloudflare Sandbox and is a
-viable execution runtime for iChef. The production design must treat each
+viable execution runtime for BuddyBox. The production design must treat each
 Sandbox as disposable: checkpoint Git state and Pi session files outside the
 container before idle expiry, then restore into a fresh Sandbox identity.
 
@@ -39,7 +39,7 @@ sleeps: <https://developers.cloudflare.com/containers/pricing/>.
 
 ## Decisions this supports
 
-- Keep full Pi in the Sandbox; do not reduce iChef to a thin provider bridge.
+- Keep full Pi in the Sandbox; do not reduce BuddyBox to a thin provider bridge.
 - Bake Pi and its dependencies into a version-matched image. The Worker SDK and
   base image are both pinned to Cloudflare Sandbox 0.12.6 and use RPC transport.
 - Use port 4173 or another non-reserved user port. Port 3000 belongs to the
@@ -50,7 +50,7 @@ sleeps: <https://developers.cloudflare.com/containers/pricing/>.
   inside the same request produced interrupted operations.
 - Treat quick tunnels as development convenience. Production Preview requires
   a named tunnel/custom hostname plus readiness and retry handling.
-- Enforce egress policy and provider access at iChef's typed gateways. The
+- Enforce egress policy and provider access at BuddyBox's typed gateways. The
   Sandbox has general outbound network access, so the absence of standing
   credentials—not assumed network isolation—is the primary credential boundary.
 - Persist sanitized milestones and terminal Run outcomes in Convex. The local

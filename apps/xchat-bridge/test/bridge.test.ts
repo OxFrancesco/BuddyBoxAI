@@ -178,8 +178,8 @@ describe("X Chat orchestration", () => {
     await expect(bridge.acceptWebhookPayload({})).rejects.toThrow("temporarily unavailable");
     expect(await bridge.acceptWebhookPayload({})).toBe("duplicate");
     expect(preparedTexts).toEqual([
-      "Welcome to iChef. Securely connect this X Chat account: https://ichef.buddytools.org/connect/xchat?claim=exact-token-value",
-      "Welcome to iChef. Securely connect this X Chat account: https://ichef.buddytools.org/connect/xchat?claim=exact-token-value",
+      "Welcome to BuddyBox. Securely connect this X Chat account: https://buddybox.buddytools.org/connect/xchat?claim=exact-token-value",
+      "Welcome to BuddyBox. Securely connect this X Chat account: https://buddybox.buddytools.org/connect/xchat?claim=exact-token-value",
     ]);
     expect(sends).toEqual([prepared]);
   });
@@ -193,7 +193,7 @@ describe("X Chat orchestration", () => {
       protector: new EnvelopeProtector(KEY),
       vault: new FailFirstDirectReplyWriteVault(),
       addressPepper: "address_pepper_long_enough",
-      portalUrl: "https://ichef.buddytools.org",
+      portalUrl: "https://buddybox.buddytools.org",
       claimTokenFactory: () => {
         tokenCreations += 1;
         return "same-bridge-owned-token";
@@ -235,12 +235,12 @@ describe("X Chat orchestration", () => {
     expect(tokenCreations).toBe(1);
     expect(preparations).toBe(1);
     expect(preparedTexts).toEqual([
-      "Welcome to iChef. Securely connect this X Chat account: https://ichef.buddytools.org/connect/xchat?claim=same-bridge-owned-token",
+      "Welcome to BuddyBox. Securely connect this X Chat account: https://buddybox.buddytools.org/connect/xchat?claim=same-bridge-owned-token",
     ]);
   });
 
   test("rebuilds the exact claim reply after prepared-payload persistence fails", async () => {
-    const claimText = "Welcome to iChef. Securely connect this X Chat account: https://ichef.buddytools.org/connect/xchat?claim=durable-token-value";
+    const claimText = "Welcome to BuddyBox. Securely connect this X Chat account: https://buddybox.buddytools.org/connect/xchat?claim=durable-token-value";
     const prepared: PreparedSend = {
       messageId: "rebuilt-claim-message",
       conversationId: verifiedMessage().conversationId,

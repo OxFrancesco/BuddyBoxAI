@@ -97,7 +97,7 @@ describe("project onboarding gate", () => {
   });
 
   test("uses the no-extra-account managed hostname convention", () => {
-    expect(managedProjectHostname).toBe("<project>-ichef-sites.buddytools.org");
+    expect(managedProjectHostname).toBe("<project>-buddybox-sites.buddytools.org");
     expect(managedHosting.detail).toContain(managedProjectHostname);
     expect(managedHosting.detail).toContain("No Cloudflare account is required");
   });

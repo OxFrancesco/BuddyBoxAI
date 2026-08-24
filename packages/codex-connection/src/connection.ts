@@ -418,11 +418,11 @@ export class CodexConnectionManager {
   }
 
   private sessionAad(userId: string, sessionId: string): string {
-    return `ichef:codex-device:v1:${userId}:${sessionId}`;
+    return `buddybox:codex-device:v1:${userId}:${sessionId}`;
   }
 
   private credentialAad(userId: string, kind: "access" | "refresh"): string {
-    return `ichef:codex-credential:v1:${userId}:${kind}`;
+    return `buddybox:codex-credential:v1:${userId}:${kind}`;
   }
 
   private async finishPendingPoll(

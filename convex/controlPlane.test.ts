@@ -27,7 +27,7 @@ const modules = {
 function identity(subject: string) {
   return {
     subject,
-    tokenIdentifier: `https://issuer.ichef.test|${subject}`,
+    tokenIdentifier: `https://issuer.buddybox.test|${subject}`,
   };
 }
 
@@ -197,8 +197,8 @@ describe("authenticated Convex control plane", () => {
     const [aliceProject, bobProject] = await t.run((ctx) =>
       Promise.all([ctx.db.get(alice.projectId), ctx.db.get(bob.projectId)]),
     );
-    expect(aliceProject?.hostingHostname).toEndWith("-ichef-sites.buddytools.org");
-    expect(bobProject?.hostingHostname).toEndWith("-ichef-sites.buddytools.org");
+    expect(aliceProject?.hostingHostname).toEndWith("-buddybox-sites.buddytools.org");
+    expect(bobProject?.hostingHostname).toEndWith("-buddybox-sites.buddytools.org");
     expect(aliceProject?.hostingHostname).not.toBe(bobProject?.hostingHostname);
 
     const now = Date.now();

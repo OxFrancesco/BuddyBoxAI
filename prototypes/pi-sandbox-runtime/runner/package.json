@@ -1,5 +1,5 @@
 {
-  "name": "@ichef/prototype-pi-runner",
+  "name": "@buddybox/prototype-pi-runner",
   "private": true,
   "type": "module",
   "dependencies": {

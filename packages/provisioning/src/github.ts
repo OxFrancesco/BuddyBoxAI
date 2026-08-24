@@ -125,7 +125,7 @@ export class GitHubAppProvisioner {
       headers: {
         accept: "application/json",
         "content-type": "application/x-www-form-urlencoded",
-        "user-agent": "iChef/0.1",
+        "user-agent": "BuddyBox/0.1",
       },
       body,
       redirect: "manual",

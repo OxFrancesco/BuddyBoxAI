@@ -48,8 +48,8 @@ describe("project proposal payload", () => {
     expect(proposal).toEqual({
       name: "Field Notes",
       brief: "A calm field guide for seasonal ingredients.",
-      planJson: "{\"version\":1,\"project\":{\"name\":\"Field Notes\",\"brief\":\"A calm field guide for seasonal ingredients.\"},\"stack\":[\"TanStack Start\",\"Clerk\",\"Convex\"],\"delivery\":{\"source\":\"GitHub\",\"hosting\":\"iChef managed Cloudflare\",\"approval\":\"verified messaging channel\"}}",
-      payloadHash: "0a104b479d309238601161efbe4cb546ae6883ba924da49dcbdc95a779de4548",
+      planJson: "{\"version\":1,\"project\":{\"name\":\"Field Notes\",\"brief\":\"A calm field guide for seasonal ingredients.\"},\"stack\":[\"TanStack Start\",\"Clerk\",\"Convex\"],\"delivery\":{\"source\":\"GitHub\",\"hosting\":\"BuddyBox managed Cloudflare\",\"approval\":\"verified messaging channel\"}}",
+      payloadHash: "43ae5959bbfc9a3490af97ea10f956397ec269dc12d31a4a1d4c064bc86920ac",
       expiresAt: Date.UTC(2026, 7, 21, 11, 0, 0),
     });
   });

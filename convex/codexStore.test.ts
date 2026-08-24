@@ -13,7 +13,7 @@ const modules = {
 
 describe("Codex connection CAS storage", () => {
   test("serializes credential refreshes and deletes locally before disconnect returns", async () => {
-    const identity = { subject: "codex-user", tokenIdentifier: "https://issuer.ichef.test|codex-user" };
+    const identity = { subject: "codex-user", tokenIdentifier: "https://issuer.buddybox.test|codex-user" };
     const t = convexTest(schema, modules);
     const user = await t.withIdentity(identity).mutation(api.users.syncCurrent, {});
     expect(await t.mutation(internal.codexStore.commit, {

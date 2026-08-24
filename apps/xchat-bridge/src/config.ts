@@ -28,16 +28,16 @@ export function readConfig(env: Record<string, string | undefined> = process.env
   if (refreshToken && !oauthClientId) throw new Error("X_OAUTH_CLIENT_ID is required with a refresh token");
   const apiBaseUrl = secureUrl(optional(env.X_API_BASE_URL) ?? "https://api.x.com");
   const brokerUrl = secureUrl(required(env, "CONVEX_XCHAT_BROKER_URL"));
-  const portalUrl = secureUrl(optional(env.PUBLIC_PORTAL_URL) ?? "https://ichef.buddytools.org");
+  const portalUrl = secureUrl(optional(env.PUBLIC_PORTAL_URL) ?? "https://buddybox.buddytools.org");
   const realmTokens = parseSecretMap(required(env, "X_CHAT_REALM_TOKENS_JSON"));
-  const routeEncryptionKey = required(env, "ICHEF_ROUTE_ENCRYPTION_KEY");
+  const routeEncryptionKey = required(env, "BUDDYBOX_ROUTE_ENCRYPTION_KEY");
   const vaultEncryptionKey = required(env, "XCHAT_VAULT_ENCRYPTION_KEY");
   if (decodeBase64(routeEncryptionKey).byteLength !== 32 || decodeBase64(vaultEncryptionKey).byteLength !== 32) {
     throw new Error("Encryption keys must decode to 32 bytes");
   }
   const consumerSecret = required(env, "X_API_CONSUMER_SECRET");
-  const bridgeSecret = required(env, "ICHEF_BRIDGE_SECRET");
-  const addressPepper = required(env, "ICHEF_ADDRESS_PEPPER");
+  const bridgeSecret = required(env, "BUDDYBOX_BRIDGE_SECRET");
+  const addressPepper = required(env, "BUDDYBOX_ADDRESS_PEPPER");
   if ([consumerSecret, bridgeSecret, addressPepper].some((value) => value.length < 16)) {
     throw new Error("Bridge secrets must be at least 16 characters");
   }

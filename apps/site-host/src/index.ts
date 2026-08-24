@@ -1,12 +1,12 @@
 const MANAGED_DEPLOY_HOST = "site-host.internal";
-const MANIFEST_NAME = ".ichef-manifest.json";
+const MANIFEST_NAME = ".buddybox-manifest.json";
 const MAX_BODY_BYTES = 12 * 1024 * 1024;
 const MAX_TOTAL_ASSET_BYTES = 8 * 1024 * 1024;
 const MAX_ASSET_BYTES = 2 * 1024 * 1024;
 const MAX_ASSETS = 256;
 const encoder = new TextEncoder();
 
-type SiteHostEnv = Env & { ICHEF_SITE_HOST_SECRET: string };
+type SiteHostEnv = Env & { BUDDYBOX_SITE_HOST_SECRET: string };
 
 type DecodedAsset = {
   path: string;
@@ -199,7 +199,7 @@ async function brokerCall(env: SiteHostEnv, operation: string, input: Record<str
   const response = await fetch(env.CONVEX_SITE_HOST_URL, {
     method: "POST",
     headers: {
-      authorization: `Bearer ${env.ICHEF_SITE_HOST_SECRET}`,
+      authorization: `Bearer ${env.BUDDYBOX_SITE_HOST_SECRET}`,
       "content-type": "application/json",
     },
     body: JSON.stringify({ operation, input }),

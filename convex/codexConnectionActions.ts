@@ -7,7 +7,7 @@ import {
   type CodexConnectionRepository,
   type DeviceConnectionStatus,
   type PersistedCodexConnection,
-} from "@ichef/codex-connection";
+} from "@buddybox/codex-connection";
 import { ConvexError, v } from "convex/values";
 
 import { internal } from "./_generated/api";
@@ -39,8 +39,8 @@ async function currentOwner(ctx: ActionCtx): Promise<Id<"users">> {
 }
 
 async function managerFor(ctx: ActionCtx): Promise<CodexConnectionManager> {
-  const key = process.env.ICHEF_CODEX_CREDENTIAL_KEY;
-  if (!key) throw new Error("ICHEF_CODEX_CREDENTIAL_KEY is not configured");
+  const key = process.env.BUDDYBOX_CODEX_CREDENTIAL_KEY;
+  if (!key) throw new Error("BUDDYBOX_CODEX_CREDENTIAL_KEY is not configured");
   const repository: CodexConnectionRepository = {
     async load(userId) {
       const stored: { revision: number; valueJson: string } | null = await ctx.runQuery(

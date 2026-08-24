@@ -17,7 +17,7 @@ describe("provider connection prerequisites", () => {
 
   test("keeps GitHub an explicit prerequisite for project creation", () => {
     const github = providerConnectionRequirements.github;
-    expect(github.summary).toContain("must be verified before iChef can create a project");
+    expect(github.summary).toContain("must be verified before BuddyBox can create a project");
     expect(github.gateNotice).toContain("Project creation stays locked");
   });
 

@@ -15,7 +15,7 @@ async function brokerEgress(request: Request, env: Env, provider: "openrouter" |
     if (key.startsWith("cf-")) cloudflareHeaders.push(key);
   });
   for (const key of cloudflareHeaders) headers.delete(key);
-  headers.set("x-ichef-egress-provider", provider);
+  headers.set("x-buddybox-egress-provider", provider);
   if (provider !== "github") headers.delete("authorization");
   const target = new URL(`https://credential-broker.internal/v1/egress/${provider}${source.pathname}`);
   target.search = source.search;
@@ -47,9 +47,9 @@ export class Sandbox extends BaseSandbox<Env> {
 }
 
 Sandbox.outboundByHost = {
-  "models.ichef.internal": (request, env) => brokerEgress(request, env, "openrouter"),
-  "codex.ichef.internal": (request, env) => brokerEgress(request, env, "openai-codex"),
-  "github.ichef.internal": (request, env) => brokerEgress(request, env, "github"),
+  "models.buddybox.internal": (request, env) => brokerEgress(request, env, "openrouter"),
+  "codex.buddybox.internal": (request, env) => brokerEgress(request, env, "openai-codex"),
+  "github.buddybox.internal": (request, env) => brokerEgress(request, env, "github"),
   "registry.npmjs.org": (request) => packageRegistryEgress(request),
 };
 

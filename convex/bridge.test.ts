@@ -13,7 +13,7 @@ const modules = {
 };
 
 function identity(subject: string) {
-  return { subject, tokenIdentifier: `https://issuer.ichef.test|${subject}` };
+  return { subject, tokenIdentifier: `https://issuer.buddybox.test|${subject}` };
 }
 
 describe("Spectrum trust broker", () => {

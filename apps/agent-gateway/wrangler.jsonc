@@ -1,6 +1,6 @@
 {
   "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "ichef-agent-gateway",
+  "name": "buddybox-agent-gateway",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-13",
   "compatibility_flags": ["nodejs_compat"],
@@ -10,12 +10,12 @@
     "traces": { "enabled": true, "head_sampling_rate": 0.05 }
   },
   "services": [
-    { "binding": "CONTROL_PLANE", "service": "ichef-control-plane" },
-    { "binding": "CREDENTIAL_BROKER", "service": "ichef-credential-broker" },
-    { "binding": "SITE_HOST", "service": "ichef-site-host" }
+    { "binding": "CONTROL_PLANE", "service": "buddybox-control-plane" },
+    { "binding": "CREDENTIAL_BROKER", "service": "buddybox-credential-broker" },
+    { "binding": "SITE_HOST", "service": "buddybox-site-host" }
   ],
   "r2_buckets": [
-    { "binding": "CHECKPOINTS", "bucket_name": "ichef-agent-checkpoints" }
+    { "binding": "CHECKPOINTS", "bucket_name": "buddybox-agent-checkpoints" }
   ],
   "containers": [
     {

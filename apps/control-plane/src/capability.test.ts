@@ -30,7 +30,7 @@ describe("gateway capabilities", () => {
       releaseId: "release_1",
       sourceRunId: "run_1",
       commitSha: "a".repeat(40),
-      hostname: "project-ichef-sites.buddytools.org",
+      hostname: "project-buddybox-sites.buddytools.org",
       artifactManifestDigest: "b".repeat(64),
       exp: 1_800_000_120,
     }, "secret", 1_800_000_000);

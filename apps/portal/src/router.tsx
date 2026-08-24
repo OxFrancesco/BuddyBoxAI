@@ -12,7 +12,7 @@ export function getRouter() {
         <div className="text-center">
           <p className="eyebrow">404 · Off menu</p>
           <h1 className="mt-3 text-4xl font-semibold">That dish isn't here.</h1>
-          <a className="mt-6 inline-block text-lime-300" href="/">Return to iChef</a>
+          <a className="mt-6 inline-block text-lime-300" href="/">Return to BuddyBox</a>
         </div>
       </main>
     ),

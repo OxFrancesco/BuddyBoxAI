@@ -1,4 +1,4 @@
-# iChef credential broker
+# BuddyBox credential broker
 
 This Worker is the only boundary that turns a run capability into provider
 authorization. Sandboxes receive the capability, never GitHub or model tokens.
@@ -23,10 +23,10 @@ headers are discarded. GitHub redirects are never followed or relayed.
 
 ## Configuration
 
-- `CONTROL_PLANE`: service binding to `ichef-control-plane`.
+- `CONTROL_PLANE`: service binding to `buddybox-control-plane`.
 - `CONVEX_CREDENTIAL_URL`: trusted Codex credential endpoint.
 - `CONVEX_GITHUB_CREDENTIAL_URL`: trusted project-bound GitHub metadata endpoint.
-- `ICHEF_CREDENTIAL_BROKER_SECRET`: shared secret set in both this Worker and
+- `BUDDYBOX_CREDENTIAL_BROKER_SECRET`: shared secret set in both this Worker and
   Convex.
 - `GITHUB_APP_ID`: GitHub App numeric ID.
 - `GITHUB_APP_PRIVATE_KEY`: GitHub App PEM private key. Both GitHub's PKCS#1 PEM

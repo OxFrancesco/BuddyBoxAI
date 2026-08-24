@@ -11,10 +11,10 @@ const env = {
   X_CHAT_PIN: "safe-pin-value",
   X_CHAT_REALM_TOKENS_JSON: '{"abcd":"realm-token"}',
   CONVEX_XCHAT_BROKER_URL: "https://example.convex.site/v1/xchat/broker",
-  ICHEF_BRIDGE_SECRET: "bridge_secret_long_enough",
-  ICHEF_ROUTE_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
+  BUDDYBOX_BRIDGE_SECRET: "bridge_secret_long_enough",
+  BUDDYBOX_ROUTE_ENCRYPTION_KEY: Buffer.alloc(32, 9).toString("base64"),
   XCHAT_VAULT_ENCRYPTION_KEY: Buffer.alloc(32, 8).toString("base64"),
-  ICHEF_ADDRESS_PEPPER: "address_pepper_long_enough",
+  BUDDYBOX_ADDRESS_PEPPER: "address_pepper_long_enough",
 };
 
 describe("configuration", () => {
@@ -23,12 +23,12 @@ describe("configuration", () => {
       port: 3000,
       botUserId: "123456",
       pollIntervalMs: 2000,
-      portalUrl: "https://ichef.buddytools.org",
+      portalUrl: "https://buddybox.buddytools.org",
     });
   });
 
   test("rejects malformed encryption material and insecure remote URLs", () => {
-    expect(() => readConfig({ ...env, ICHEF_ROUTE_ENCRYPTION_KEY: "bad" })).toThrow();
+    expect(() => readConfig({ ...env, BUDDYBOX_ROUTE_ENCRYPTION_KEY: "bad" })).toThrow();
     expect(() => readConfig({ ...env, CONVEX_XCHAT_BROKER_URL: "http://example.com" })).toThrow();
     expect(() => readConfig({ ...env, PUBLIC_PORTAL_URL: "http://example.com" })).toThrow();
   });

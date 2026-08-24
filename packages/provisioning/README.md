@@ -1,4 +1,4 @@
-# iChef provisioning
+# BuddyBox provisioning
 
 Typed user-owned resource provisioning. The GitHub seam deliberately separates
 two short-lived authorities:

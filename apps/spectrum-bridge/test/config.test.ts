@@ -6,9 +6,9 @@ const baseEnv = {
   SPECTRUM_PROJECT_ID: "project-id",
   SPECTRUM_PROJECT_SECRET: "project_secret_value",
   SPECTRUM_WEBHOOK_SECRET: "webhook_secret_value",
-  ICHEF_ADDRESS_PEPPER: "address_pepper_value",
+  BUDDYBOX_ADDRESS_PEPPER: "address_pepper_value",
   CONVEX_BRIDGE_URL: "https://example.convex.site/bridge/spectrum",
-  ICHEF_BRIDGE_SECRET: "bridge_secret_value",
+  BUDDYBOX_BRIDGE_SECRET: "bridge_secret_value",
 };
 
 describe("bridge configuration seam", () => {

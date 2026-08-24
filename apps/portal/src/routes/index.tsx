@@ -36,7 +36,7 @@ export const Route = createFileRoute("/")({ component: Home });
 const conversation = [
   { from: "user", body: "Build a private recipe book. Calm, editorial, fast." },
   { from: "chef", body: "On it. I’ll use TanStack Start, Clerk, and Convex. Your GitHub repo will stay yours." },
-  { from: "chef", body: "Preview is ready on your iChef address — auth, recipe CRUD, and mobile checks all pass.", action: "Open preview" },
+  { from: "chef", body: "Preview is ready on your BuddyBox address — auth, recipe CRUD, and mobile checks all pass.", action: "Open preview" },
   { from: "user", body: "Ship it" },
   { from: "chef", body: "Production needs your approval. Reply APPROVE 7K2." },
 ];
@@ -55,9 +55,9 @@ function Home() {
       <div className="ambient ambient--one" />
       <div className="ambient ambient--two" />
       <header className="nav-wrap">
-        <a className="brand" href="#top" aria-label="iChef home">
+        <a className="brand" href="#top" aria-label="BuddyBox home">
           <BrandMark />
-          <span>iChef</span>
+          <span>BuddyBox</span>
           <em>technical preview</em>
         </a>
         <nav aria-label="Primary navigation">
@@ -84,7 +84,7 @@ function Home() {
           <div className="status-pill"><span /> Technical preview · external providers pending</div>
           <h1>Your next website starts with a <i>message.</i></h1>
           <p className="hero-lede">
-            Meet iChef, the coding agent you can reach through iMessage or X Chat.
+            Meet BuddyBox, the coding agent you can reach through iMessage or X Chat.
             Describe what you want; Pi cooks the code, verifies every course, and asks before it ships.
           </p>
           <div className="hero-actions">
@@ -118,7 +118,7 @@ function Home() {
             <div className="phone-island" />
             <div className="phone-header">
               <span className="mini-mark"><ChefHat size={16} /></span>
-              <div><strong>iChef</strong><small>iMessage · X Chat</small></div>
+              <div><strong>BuddyBox</strong><small>iMessage · X Chat</small></div>
               <span className="phone-info">i</span>
             </div>
             <div className="messages">
@@ -136,7 +136,7 @@ function Home() {
               ))}
               <div className="typing"><span /><span /><span /></div>
             </div>
-            <div className="message-bar"><span>＋</span><div>Message iChef</div><span>◉</span></div>
+            <div className="message-bar"><span>＋</span><div>Message BuddyBox</div><span>◉</span></div>
           </div>
           <div className="service-note note--bottom"><ShieldCheck size={16} /> Approval required to ship</div>
         </motion.div>
@@ -172,14 +172,14 @@ function Home() {
           <div className="ownership-grid">
             <article><Github /><strong>Repository</strong><p>Created in your GitHub account with every commit visible.</p></article>
             <article><Sparkles /><strong>Model access</strong><p>Your connected ChatGPT account, with OpenRouter fallback.</p></article>
-            <article><Cloud /><strong>Managed hosting</strong><p>Every approved release gets an iChef-managed Cloudflare address; no Cloudflare account required.</p></article>
+            <article><Cloud /><strong>Managed hosting</strong><p>Every approved release gets an BuddyBox-managed Cloudflare address; no Cloudflare account required.</p></article>
             <article><ShieldCheck /><strong>Release control</strong><p>Preview freely. Production and rollback always need approval.</p></article>
           </div>
         </div>
       </section>
 
       <footer>
-        <a className="brand" href="#top"><BrandMark /><span>iChef</span></a>
+        <a className="brand" href="#top"><BrandMark /><span>BuddyBox</span></a>
         <p>From “I have an idea” to live, from iMessage or X Chat.</p>
         <span>Cooked with Pi · TanStack · Clerk · Convex · Cloudflare</span>
       </footer>
@@ -237,7 +237,7 @@ function OnboardingSection({ state, loading = false }: { state: OnboardingState;
           <h2>Five checks.<br />Pick your conversation.</h2>
           <p>
             Sign in with Google through Clerk, then verify either iMessage or X Chat.
-            GitHub stays repository-only; hosting is already managed by iChef.
+            GitHub stays repository-only; hosting is already managed by BuddyBox.
           </p>
           <div className="progress-copy">
             <span>{readiness.completed} of {readiness.total} ready</span>

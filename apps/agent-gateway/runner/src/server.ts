@@ -11,13 +11,13 @@ import { chromium } from "playwright";
 import { parseRunRequest, publicAgentEvent, RUNNER_LIMITS, type RunnerRunRequest } from "./protocol";
 
 const workspace = "/workspace";
-const sessionDirectory = `${workspace}/.ichef/pi-sessions`;
+const sessionDirectory = `${workspace}/.buddybox/pi-sessions`;
 const encoder = new TextEncoder();
 
 function brokeredCodexToken(): string {
   const header = Buffer.from(JSON.stringify({ alg: "none", typ: "JWT" })).toString("base64url");
   const payload = Buffer.from(JSON.stringify({
-    "https://api.openai.com/auth": { chatgpt_account_id: "ichef-broker" },
+    "https://api.openai.com/auth": { chatgpt_account_id: "buddybox-broker" },
   })).toString("base64url");
   return `${header}.${payload}.brokered`;
 }
@@ -77,12 +77,12 @@ async function modelFor(request: RunnerRunRequest, signal: AbortSignal): Promise
     ...base,
     headers: {
       ...base.headers,
-      "x-ichef-run-capability": request.capability,
+      "x-buddybox-run-capability": request.capability,
     },
     baseUrl:
       request.provider === "openai-codex"
-        ? "http://codex.ichef.internal/backend-api"
-        : "http://models.ichef.internal/v1",
+        ? "http://codex.buddybox.internal/backend-api"
+        : "http://models.buddybox.internal/v1",
   };
   return { model, runtime };
 }
@@ -148,7 +148,7 @@ async function executeRun(
       : SessionManager.create(workspace, sessionDirectory);
     const created = await createAgentSession({
       cwd: workspace,
-      agentDir: `${workspace}/.ichef/pi-agent`,
+      agentDir: `${workspace}/.buddybox/pi-agent`,
       model,
       modelRuntime: runtime,
       thinkingLevel: "high",
@@ -310,4 +310,4 @@ const server = Bun.serve({
   },
 });
 
-console.log(JSON.stringify({ message: "iChef agent runner ready", port: server.port }));
+console.log(JSON.stringify({ message: "BuddyBox agent runner ready", port: server.port }));

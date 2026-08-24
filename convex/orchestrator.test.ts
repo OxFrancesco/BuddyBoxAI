@@ -3,16 +3,16 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { decryptBridgePayload, encryptBridgePayload } from "./lib/bridgeCrypto";
 import { parseRuntimeEvent } from "./orchestrator";
 
-const previousRouteKey = process.env.ICHEF_ROUTE_ENCRYPTION_KEY;
+const previousRouteKey = process.env.BUDDYBOX_ROUTE_ENCRYPTION_KEY;
 
 afterEach(() => {
-  if (previousRouteKey === undefined) delete process.env.ICHEF_ROUTE_ENCRYPTION_KEY;
-  else process.env.ICHEF_ROUTE_ENCRYPTION_KEY = previousRouteKey;
+  if (previousRouteKey === undefined) delete process.env.BUDDYBOX_ROUTE_ENCRYPTION_KEY;
+  else process.env.BUDDYBOX_ROUTE_ENCRYPTION_KEY = previousRouteKey;
 });
 
 describe("orchestrator boundaries", () => {
   test("opens only authenticated route payloads", async () => {
-    process.env.ICHEF_ROUTE_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
+    process.env.BUDDYBOX_ROUTE_ENCRYPTION_KEY = Buffer.alloc(32, 7).toString("base64");
     const ciphertext = await encryptBridgePayload({ text: "Build a calmer dashboard." });
     await expect(decryptBridgePayload<{ text: string }>(ciphertext)).resolves.toEqual({
       text: "Build a calmer dashboard.",

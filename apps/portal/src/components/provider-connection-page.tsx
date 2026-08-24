@@ -51,7 +51,7 @@ export function ProviderConnectionPage({ icon, provider }: ProviderConnectionPag
   return (
     <main className="connect-page provider-connect-page">
       <header className="connect-nav">
-        <Link className="brand" to="/"><BrandMark /><span>iChef</span></Link>
+        <Link className="brand" to="/"><BrandMark /><span>BuddyBox</span></Link>
         <span><LockKeyhole size={14} /> Protected by your Clerk session</span>
       </header>
 
@@ -67,7 +67,7 @@ export function ProviderConnectionPage({ icon, provider }: ProviderConnectionPag
         <div className="provider-prerequisites">
           <div className="provider-prerequisites__heading">
             <span>Before authorization can open</span>
-            <small>iChef operator</small>
+            <small>BuddyBox operator</small>
           </div>
           <ol>
             {provider.operatorPrerequisites.map((requirement) => (
@@ -94,7 +94,7 @@ export function ProviderConnectionPage({ icon, provider }: ProviderConnectionPag
             : `Authorize ${provider.eyebrow.replace("Connect ", "")}`}
         </Button>
         <p id={`${provider.id}-availability`} className="provider-disabled-copy">
-          iChef creates a short-lived, one-use, Clerk-bound OAuth state before leaving this page.
+          BuddyBox creates a short-lived, one-use, Clerk-bound OAuth state before leaving this page.
         </p>
         {authorizationState === "configuration_required" ? (
           <div className="connect-notice is-warning" role="alert">

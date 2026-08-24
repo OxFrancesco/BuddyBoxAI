@@ -16,7 +16,7 @@ function deploymentRequest() {
       releaseId: "release_1",
       sourceRunId: "run_1",
       commitSha: "abcdef1",
-      hostname: "demo-ichef-sites.buddytools.org",
+      hostname: "demo-buddybox-sites.buddytools.org",
       artifactManifestDigest,
       assets: [{ path: "index.html", data: "aGVsbG8=", sha256 }],
     }),
@@ -25,9 +25,9 @@ function deploymentRequest() {
 
 function deploymentEnv(events: string[], authority: Record<string, unknown> = {}) {
   return {
-    SITES_BASE_DOMAIN: "ichef-sites.buddytools.org",
+    SITES_BASE_DOMAIN: "buddybox-sites.buddytools.org",
     CONVEX_SITE_HOST_URL: "https://convex.test/site-host",
-    ICHEF_SITE_HOST_SECRET: "s".repeat(64),
+    BUDDYBOX_SITE_HOST_SECRET: "s".repeat(64),
     CONTROL_PLANE: {
       fetch: async () => Response.json({
         userId: "user_1",
@@ -37,7 +37,7 @@ function deploymentEnv(events: string[], authority: Record<string, unknown> = {}
         releaseId: "release_1",
         sourceRunId: "run_1",
         commitSha: "abcdef1",
-        hostname: "demo-ichef-sites.buddytools.org",
+        hostname: "demo-buddybox-sites.buddytools.org",
         artifactManifestDigest,
         ...authority,
       }),
@@ -58,7 +58,7 @@ describe("site-host input validation", () => {
     expect(testables.validateAssetPath("index.html")).toBe("index.html");
   });
 
-  test.each(["/index.html", "../secret", "a/../b", "a//b", "a\\b", "a%2fb", ".ichef-manifest.json", ".env", "assets/.secret"])(
+  test.each(["/index.html", "../secret", "a/../b", "a//b", "a\\b", "a%2fb", ".buddybox-manifest.json", ".env", "assets/.secret"])(
     "rejects unsafe asset path %s",
     (path) => expect(() => testables.validateAssetPath(path)).toThrow(),
   );
@@ -103,13 +103,13 @@ describe("site-host public requests", () => {
   });
 
   test("only resolves exact managed child hosts", () => {
-    expect(testables.projectHost("demo-abc-ichef-sites.buddytools.org", "ichef-sites.buddytools.org")).toBe(true);
-    expect(testables.projectHost(`${"a".repeat(51)}-ichef-sites.buddytools.org`, "ichef-sites.buddytools.org")).toBe(true);
-    expect(testables.projectHost(`${"a".repeat(52)}-ichef-sites.buddytools.org`, "ichef-sites.buddytools.org")).toBe(false);
-    expect(testables.projectHost("ichef-sites.buddytools.org", "ichef-sites.buddytools.org")).toBe(false);
-    expect(testables.projectHost("demo.sites.ichef.buddytools.org", "ichef-sites.buddytools.org")).toBe(false);
-    expect(testables.projectHost("demo-ichef-sites.buddytools.org.evil.test", "ichef-sites.buddytools.org")).toBe(false);
-    expect(testables.projectHost("deep.demo-ichef-sites.buddytools.org", "ichef-sites.buddytools.org")).toBe(false);
+    expect(testables.projectHost("demo-abc-buddybox-sites.buddytools.org", "buddybox-sites.buddytools.org")).toBe(true);
+    expect(testables.projectHost(`${"a".repeat(48)}-buddybox-sites.buddytools.org`, "buddybox-sites.buddytools.org")).toBe(true);
+    expect(testables.projectHost(`${"a".repeat(49)}-buddybox-sites.buddytools.org`, "buddybox-sites.buddytools.org")).toBe(false);
+    expect(testables.projectHost("buddybox-sites.buddytools.org", "buddybox-sites.buddytools.org")).toBe(false);
+    expect(testables.projectHost("demo.sites.buddybox.buddytools.org", "buddybox-sites.buddytools.org")).toBe(false);
+    expect(testables.projectHost("demo-buddybox-sites.buddytools.org.evil.test", "buddybox-sites.buddytools.org")).toBe(false);
+    expect(testables.projectHost("deep.demo-buddybox-sites.buddytools.org", "buddybox-sites.buddytools.org")).toBe(false);
   });
 
   test("uses immutable cache for fingerprinted assets and revalidates html", () => {
@@ -164,7 +164,7 @@ describe("site-host deployment boundary", () => {
         result: {
           status: "live",
           deploymentRef: `r2:v1:${"d".repeat(64)}`,
-          liveUrl: "https://demo-ichef-sites.buddytools.org/",
+          liveUrl: "https://demo-buddybox-sites.buddytools.org/",
         },
       });
     }) as unknown as typeof fetch);
@@ -172,7 +172,7 @@ describe("site-host deployment boundary", () => {
     expect(response.status).toBe(201);
     expect(await response.json()).toMatchObject({
       deploymentRef: `r2:v1:${"d".repeat(64)}`,
-      liveUrl: "https://demo-ichef-sites.buddytools.org/",
+      liveUrl: "https://demo-buddybox-sites.buddytools.org/",
     });
     expect(events).toEqual(["broker:reserve_upload"]);
   });

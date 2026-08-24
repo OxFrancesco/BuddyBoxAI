@@ -63,7 +63,7 @@ function ConnectChatGpt() {
   return (
     <main className="connect-page">
       <header className="connect-nav">
-        <Link className="brand" to="/"><BrandMark /><span>iChef</span></Link>
+        <Link className="brand" to="/"><BrandMark /><span>BuddyBox</span></Link>
         <span>Tokens stay encrypted outside active runs</span>
       </header>
       <section className="connect-card">
@@ -87,7 +87,7 @@ function ConnectChatGpt() {
         ) : (
           <>
             <p className="connect-copy">
-              iChef uses OpenAI’s Codex device authorization. Your refresh credential is encrypted
+              BuddyBox uses OpenAI’s Codex device authorization. Your refresh credential is encrypted
               in Convex; only a current access token reaches the private broker for one authorized run.
             </p>
             <Button size="lg" disabled={working || !isAuthenticated} onClick={() => void begin()}>

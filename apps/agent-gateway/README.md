@@ -1,6 +1,6 @@
-# iChef Agent Gateway
+# BuddyBox Agent Gateway
 
-The Agent Gateway is iChef's trusted Cloudflare Worker boundary around the full Pi coding runtime. Every User/Project/generation gets a deterministically isolated Cloudflare Sandbox. The public API never exposes Pi RPC, tool arguments, command output, model credentials, or filesystem paths.
+The Agent Gateway is BuddyBox's trusted Cloudflare Worker boundary around the full Pi coding runtime. Every User/Project/generation gets a deterministically isolated Cloudflare Sandbox. The public API never exposes Pi RPC, tool arguments, command output, model credentials, or filesystem paths.
 
 ## Runtime boundary
 

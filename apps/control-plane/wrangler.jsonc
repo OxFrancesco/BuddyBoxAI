@@ -1,17 +1,17 @@
 {
   "$schema": "../../node_modules/wrangler/config-schema.json",
-  "name": "ichef-control-plane",
+  "name": "buddybox-control-plane",
   "main": "src/index.ts",
   "compatibility_date": "2026-08-13",
   "workers_dev": false,
   "routes": [
     {
-      "pattern": "ichef.buddytools.org/v1/orchestration/*",
+      "pattern": "buddybox.buddytools.org/v1/orchestration/*",
       "zone_name": "buddytools.org"
     }
   ],
   "services": [
-    { "binding": "AGENT_GATEWAY", "service": "ichef-agent-gateway" }
+    { "binding": "AGENT_GATEWAY", "service": "buddybox-agent-gateway" }
   ],
   "observability": { "enabled": true }
 }

@@ -7,7 +7,7 @@ const gatewaySecret = "gateway-secret-that-is-long-enough";
 const orchestratorSecret = "orchestrator-secret-that-is-long-enough";
 
 function orchestrationRequest(body: unknown, secret = orchestratorSecret) {
-  return new Request("https://ichef.buddytools.org/v1/orchestration/runs", {
+  return new Request("https://buddybox.buddytools.org/v1/orchestration/runs", {
     method: "POST",
     headers: {
       authorization: `Bearer ${secret}`,
@@ -72,7 +72,7 @@ describe("production Run orchestration", () => {
     const response = await handler.fetch(orchestrationRequest(command()), {
       AGENT_GATEWAY: gateway,
       GATEWAY_CAPABILITY_SECRET: gatewaySecret,
-      ICHEF_ORCHESTRATOR_SECRET: orchestratorSecret,
+      BUDDYBOX_ORCHESTRATOR_SECRET: orchestratorSecret,
     } as never);
 
     expect(response.status).toBe(202);
@@ -89,7 +89,7 @@ describe("production Run orchestration", () => {
     const response = await handler.fetch(orchestrationRequest(command(), "wrong"), {
       AGENT_GATEWAY: { fetch: () => Promise.resolve(new Response(null, { status: 500 })) },
       GATEWAY_CAPABILITY_SECRET: gatewaySecret,
-      ICHEF_ORCHESTRATOR_SECRET: orchestratorSecret,
+      BUDDYBOX_ORCHESTRATOR_SECRET: orchestratorSecret,
     } as never);
     expect(response.status).toBe(401);
   });
@@ -105,7 +105,7 @@ describe("production Run orchestration", () => {
         },
       },
       GATEWAY_CAPABILITY_SECRET: gatewaySecret,
-      ICHEF_ORCHESTRATOR_SECRET: orchestratorSecret,
+      BUDDYBOX_ORCHESTRATOR_SECRET: orchestratorSecret,
     } as never);
     expect(response.status).toBe(503);
     expect(calls).toBe(1);

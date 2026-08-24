@@ -24,7 +24,7 @@ describe("project isolation and credential boundary", () => {
     });
     expect(materialization.command).not.toContain("short-lived-github-capability");
     expect(materialization.remote).not.toContain("short-lived-github-capability");
-    expect(materialization.env).toEqual({ ICHEF_RUN_CAPABILITY: "short-lived-github-capability" });
+    expect(materialization.env).toEqual({ BUDDYBOX_RUN_CAPABILITY: "short-lived-github-capability" });
   });
 
   test("redacts credential-shaped text even from an allowed outcome summary", () => {

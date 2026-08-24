@@ -391,7 +391,7 @@ export const provisionProposal = internalAction({
       const repository = await ensureGitHubRepository({
         accessToken: githubAccessToken,
         login: github.login,
-        name: `ichef-${slug}`.slice(0, 100),
+        name: `buddybox-${slug}`.slice(0, 100),
         proposalId: context.proposalId,
         description: context.brief.slice(0, 240),
       });
@@ -471,9 +471,9 @@ async function executeGatewayRun(
     prompt: string;
   },
 ): Promise<void> {
-  const secret = process.env.ICHEF_ORCHESTRATOR_SECRET;
+  const secret = process.env.BUDDYBOX_ORCHESTRATOR_SECRET;
   if (!secret || secret.length < 32) throw new Error("orchestrator_not_configured");
-  const url = process.env.ICHEF_ORCHESTRATOR_URL ?? "https://ichef.buddytools.org/v1/orchestration/runs";
+  const url = process.env.BUDDYBOX_ORCHESTRATOR_URL ?? "https://buddybox.buddytools.org/v1/orchestration/runs";
   const response = await fetch(url, {
     method: "POST",
     headers: { authorization: `Bearer ${secret}`, "content-type": "application/json" },
@@ -628,7 +628,7 @@ async function ensureGitHubRepository(input: {
   proposalId: string;
   description: string;
 }): Promise<{ id: number; fullName: string; defaultBranch: string }> {
-  const marker = `iChef proposal ${input.proposalId}`;
+  const marker = `BuddyBox proposal ${input.proposalId}`;
   const response = await fetch(`${GITHUB_API}/user/repos`, {
     method: "POST",
     headers: githubHeaders(input.accessToken),
@@ -672,7 +672,7 @@ function githubHeaders(token: string): HeadersInit {
     accept: "application/vnd.github+json",
     authorization: `Bearer ${token}`,
     "content-type": "application/json",
-    "user-agent": "iChef/0.1",
+    "user-agent": "BuddyBox/0.1",
     "x-github-api-version": "2022-11-28",
   };
 }

@@ -1,5 +1,5 @@
 {
-  "name": "@ichef/control-plane",
+  "name": "@buddybox/control-plane",
   "private": true,
   "type": "module",
   "scripts": { "test": "bun test", "typecheck": "tsc --noEmit", "deploy": "wrangler deploy" },

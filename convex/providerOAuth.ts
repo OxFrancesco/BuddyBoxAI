@@ -40,7 +40,7 @@ export function githubInstallationAuthorizationUrl(
   if (!slug || !/^[a-z0-9](?:[a-z0-9-]{0,98}[a-z0-9])?$/.test(slug)) {
     throw new ConvexError({
       code: "PROVIDER_NOT_CONFIGURED",
-      message: "GITHUB_APP_SLUG is not configured by the iChef operator",
+      message: "GITHUB_APP_SLUG is not configured by the BuddyBox operator",
     });
   }
   const url = new URL(`https://github.com/apps/${slug}/installations/new`);
@@ -257,7 +257,7 @@ function providerConfig(provider: OAuthProvider): ProviderConfig {
   if (!isUserConnectableOAuthProvider(provider)) {
     throw new ConvexError({
       code: "PROVIDER_NOT_CONFIGURED",
-      message: "Cloudflare is managed by iChef and is not a User Service Connection",
+      message: "Cloudflare is managed by BuddyBox and is not a User Service Connection",
     });
   }
   if (provider === "github") {
@@ -288,7 +288,7 @@ function requireConfig(
   if (!config.clientId || !config.clientSecret) {
     throw new ConvexError({
       code: "PROVIDER_NOT_CONFIGURED",
-      message: `${provider} OAuth is not configured by the iChef operator`,
+      message: `${provider} OAuth is not configured by the BuddyBox operator`,
     });
   }
   return { ...config, clientId: config.clientId, clientSecret: config.clientSecret };
@@ -343,7 +343,7 @@ async function exchangeCode(
     headers: {
       accept: "application/json",
       "content-type": "application/x-www-form-urlencoded",
-      "user-agent": "iChef/0.1",
+      "user-agent": "BuddyBox/0.1",
     },
     body,
     redirect: "error",
@@ -390,7 +390,7 @@ async function verifyAccount(provider: OAuthProvider, accessToken: string): Prom
     });
     const installationRecord = asRecordOrNull(installation);
     if (!installationsResponse.ok || !installationRecord || installationRecord.id === undefined) {
-      throw new Error("Install the iChef GitHub App before connecting GitHub");
+      throw new Error("Install the BuddyBox GitHub App before connecting GitHub");
     }
     return {
       id: String(user.id),
@@ -426,7 +426,7 @@ async function bestEffortUpstreamRevoke(provider: OAuthProvider, accessToken: st
           accept: "application/vnd.github+json",
           authorization: `Basic ${btoa(`${config.clientId}:${config.clientSecret}`)}`,
           "content-type": "application/json",
-          "user-agent": "iChef/0.1",
+          "user-agent": "BuddyBox/0.1",
         },
         body: JSON.stringify({ access_token: accessToken }),
         redirect: "error",
@@ -443,7 +443,7 @@ function githubHeaders(accessToken: string): Record<string, string> {
     accept: "application/vnd.github+json",
     authorization: `Bearer ${accessToken}`,
     "x-github-api-version": "2022-11-28",
-    "user-agent": "iChef/0.1",
+    "user-agent": "BuddyBox/0.1",
   };
 }
 

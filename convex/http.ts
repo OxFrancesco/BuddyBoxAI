@@ -16,7 +16,7 @@ router.route({
   path: "/v1/spectrum/bridge",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const expected = process.env.ICHEF_BRIDGE_SECRET;
+    const expected = process.env.BUDDYBOX_BRIDGE_SECRET;
     const authorization = request.headers.get("authorization") ?? "";
     const actual = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
     if (!expected || expected.length < 32 || !(await safeSecretEquals(actual, expected))) {
@@ -48,7 +48,7 @@ router.route({
         const claimToken = randomToken();
         const outboundId = crypto.randomUUID();
         const idempotencyKey = `onboarding:${normalized.idempotencyKey}`;
-        const portal = new URL(process.env.PUBLIC_PORTAL_URL ?? "https://ichef.dev");
+        const portal = new URL(process.env.PUBLIC_PORTAL_URL ?? "https://buddybox.dev");
         portal.pathname = "/connect/imessage";
         portal.search = new URLSearchParams({ claim: claimToken }).toString();
         const outbound = {
@@ -56,7 +56,7 @@ router.route({
           idempotencyKey,
           spaceId: normalized.spaceId,
           ...(normalized.lineId ? { lineId: normalized.lineId } : {}),
-          text: `Welcome to iChef. Securely connect this iMessage address: ${portal.toString()}`,
+          text: `Welcome to BuddyBox. Securely connect this iMessage address: ${portal.toString()}`,
         };
         const admitted = await ctx.runMutation(internal.bridge.admitInbound, {
           providerMessageId: normalized.providerMessageId,
@@ -90,13 +90,13 @@ router.route({
           idempotencyKey,
           spaceId: challenge.spaceId,
           ...(challenge.lineId ? { lineId: challenge.lineId } : {}),
-          text: "iMessage connected to iChef. Finish connecting ChatGPT, GitHub, and Convex before starting your first project.",
+          text: "iMessage connected to BuddyBox. Finish connecting ChatGPT, GitHub, and Convex before starting your first project.",
         };
         const consumed = await ctx.runMutation(internal.bridge.consumeChallenge, {
           addressHash: challenge.addressHash,
           challengeHash: await sha256(challenge.challengeCode.toUpperCase()),
           providerMessageId: challenge.providerMessageId,
-          messageHash: await sha256(`ICHEF-${challenge.challengeCode.toUpperCase()}`),
+          messageHash: await sha256(`BUDDYBOX-${challenge.challengeCode.toUpperCase()}`),
           sentAt: Date.now(),
           outboundId,
           outboundIdempotencyKey: idempotencyKey,
@@ -151,7 +151,7 @@ router.route({
   path: "/v1/xchat/broker",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const expected = process.env.ICHEF_BRIDGE_SECRET;
+    const expected = process.env.BUDDYBOX_BRIDGE_SECRET;
     const authorization = request.headers.get("authorization") ?? "";
     const actual = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
     if (!expected || expected.length < 32 || !(await safeSecretEquals(actual, expected))) {
@@ -267,14 +267,14 @@ router.route({
   }),
 });
 
-// This endpoint is private control-plane infrastructure. The iChef site-host
+// This endpoint is private control-plane infrastructure. The BuddyBox site-host
 // must authenticate every request with the operator-managed shared secret;
 // browser/user credentials are intentionally not accepted at this boundary.
 router.route({
   path: "/v1/site-host/broker",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const expected = process.env.ICHEF_SITE_HOST_SECRET;
+    const expected = process.env.BUDDYBOX_SITE_HOST_SECRET;
     const authorization = request.headers.get("authorization") ?? "";
     const actual = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
     if (!expected || expected.length < 32 || !(await safeSecretEquals(actual, expected))) {
@@ -339,7 +339,7 @@ router.route({
   path: "/v1/credentials/codex",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const expected = process.env.ICHEF_CREDENTIAL_BROKER_SECRET;
+    const expected = process.env.BUDDYBOX_CREDENTIAL_BROKER_SECRET;
     const authorization = request.headers.get("authorization") ?? "";
     const actual = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
     if (!expected || expected.length < 32 || !(await safeSecretEquals(actual, expected))) {
@@ -365,7 +365,7 @@ router.route({
   path: "/v1/credentials/github",
   method: "POST",
   handler: httpAction(async (ctx, request) => {
-    const expected = process.env.ICHEF_CREDENTIAL_BROKER_SECRET;
+    const expected = process.env.BUDDYBOX_CREDENTIAL_BROKER_SECRET;
     const authorization = request.headers.get("authorization") ?? "";
     const actual = authorization.startsWith("Bearer ") ? authorization.slice(7) : "";
     if (!expected || expected.length < 32 || !(await safeSecretEquals(actual, expected))) {
@@ -472,7 +472,7 @@ function encryptedPayloadField(value: Record<string, unknown>, field: string) {
 
 function managedHostnameField(value: Record<string, unknown>, field: string): string {
   const hostname = stringField(value, field, 253);
-  const baseDomain = (process.env.ICHEF_SITES_BASE_DOMAIN ?? "ichef-sites.buddytools.org")
+  const baseDomain = (process.env.BUDDYBOX_SITES_BASE_DOMAIN ?? "buddybox-sites.buddytools.org")
     .trim()
     .toLowerCase()
     .replace(/\.$/, "");

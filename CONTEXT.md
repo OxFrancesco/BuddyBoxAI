@@ -1,11 +1,11 @@
-# iChef
+# BuddyBox
 
-iChef is a conversational coding agent that lets a person create, change, preview, and publish websites from an iMessage conversation.
+BuddyBox is a conversational coding agent that lets a person create, change, preview, and publish websites from an iMessage conversation.
 
 ## Language
 
 **User**:
-A person with one iChef identity who may converse through one or more iMessage Connections and own multiple Projects.
+A person with one BuddyBox identity who may converse through one or more iMessage Connections and own multiple Projects.
 _Avoid_: Customer, sender, account
 
 **iMessage Connection**:
@@ -13,15 +13,15 @@ The verified association between exactly one User and one iMessage address. A Us
 _Avoid_: Sender allowlist, phone mapping, login session
 
 **Service Connection**:
-A User-authorized relationship that lets iChef use one external service on that User's behalf. It records delegated authority and health without making stored credentials part of the User-facing concept.
+A User-authorized relationship that lets BuddyBox use one external service on that User's behalf. It records delegated authority and health without making stored credentials part of the User-facing concept.
 _Avoid_: Provider Connection, integration, API key, credential
 
 Cloudflare hosting is not a Service Connection during the managed beta. It is
-an iChef platform capability; Users never authorize or supply a Cloudflare account.
+an BuddyBox platform capability; Users never authorize or supply a Cloudflare account.
 
 **Managed Site Address**:
-The iChef-hosted address assigned to a Project release. The reserved convention
-is `<project>-ichef-sites.buddytools.org`; collisions receive a stable suffix.
+The BuddyBox-hosted address assigned to a Project release. The reserved convention
+is `<project>-buddybox-sites.buddytools.org`; collisions receive a stable suffix.
 It is not a claim of User ownership or custom-domain support.
 _Avoid_: User Cloudflare, connected host, custom domain
 
@@ -42,11 +42,11 @@ An unconfirmed description of a possible Project. It becomes a Project only when
 _Avoid_: Draft repository, empty project, conversation
 
 **Conversation**:
-The User's ongoing exchange with iChef about one Project or about creating a Project.
+The User's ongoing exchange with BuddyBox about one Project or about creating a Project.
 _Avoid_: Project, run, message thread
 
 **Run**:
-One bounded attempt by iChef to fulfill an instruction for a Project, from admission through a truthful final outcome.
+One bounded attempt by BuddyBox to fulfill an instruction for a Project, from admission through a truthful final outcome.
 _Avoid_: Conversation, sandbox, deployment, task
 
 **Run Outcome**:

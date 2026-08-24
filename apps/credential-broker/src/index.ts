@@ -7,7 +7,7 @@ export interface Env {
   CONTROL_PLANE: Fetcher;
   CONVEX_CREDENTIAL_URL: string;
   CONVEX_GITHUB_CREDENTIAL_URL: string;
-  ICHEF_CREDENTIAL_BROKER_SECRET: string;
+  BUDDYBOX_CREDENTIAL_BROKER_SECRET: string;
   GITHUB_APP_ID: string;
   GITHUB_APP_PRIVATE_KEY: string;
 }
@@ -261,7 +261,7 @@ async function installationToken(input: {
           accept: "application/vnd.github+json",
           authorization: `Bearer ${jwt}`,
           "content-type": "application/json",
-          "user-agent": "iChef/0.1",
+          "user-agent": "BuddyBox/0.1",
           "x-github-api-version": GITHUB_API_VERSION,
         },
         body: JSON.stringify({
@@ -292,7 +292,7 @@ async function resolveCodexCredential(env: Env, userId: string, fetcher: Fetcher
     const response = await fetcher(env.CONVEX_CREDENTIAL_URL, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${env.ICHEF_CREDENTIAL_BROKER_SECRET}`,
+        authorization: `Bearer ${env.BUDDYBOX_CREDENTIAL_BROKER_SECRET}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({ ownerId: userId }),
@@ -316,7 +316,7 @@ async function resolveGitHubBinding(env: Env, userId: string, projectId: string,
     const response = await fetcher(env.CONVEX_GITHUB_CREDENTIAL_URL, {
       method: "POST",
       headers: {
-        authorization: `Bearer ${env.ICHEF_CREDENTIAL_BROKER_SECRET}`,
+        authorization: `Bearer ${env.BUDDYBOX_CREDENTIAL_BROKER_SECRET}`,
         "content-type": "application/json",
       },
       body: JSON.stringify({ ownerId: userId, projectId }),
@@ -359,7 +359,7 @@ async function brokerResult(response: Response, allowedStatuses: readonly string
 }
 
 function runCapability(request: Request, provider: string): string | null {
-  let capability = request.headers.get("x-ichef-run-capability");
+  let capability = request.headers.get("x-buddybox-run-capability");
   if (!capability && provider === "github") {
     const authorization = request.headers.get("authorization") ?? "";
     capability = authorization.startsWith("Bearer ") ? authorization.slice(7) : null;

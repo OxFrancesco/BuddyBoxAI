@@ -9,7 +9,7 @@ const MODEL = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,199}$/u;
 export interface OrchestratorEnv {
   AGENT_GATEWAY: Fetcher;
   GATEWAY_CAPABILITY_SECRET: string;
-  ICHEF_ORCHESTRATOR_SECRET: string;
+  BUDDYBOX_ORCHESTRATOR_SECRET: string;
 }
 
 interface RunCommand {
@@ -30,7 +30,7 @@ export async function orchestrateRun(
   env: OrchestratorEnv,
   now: () => number,
 ): Promise<Response> {
-  if (!await authorized(request, env.ICHEF_ORCHESTRATOR_SECRET)) {
+  if (!await authorized(request, env.BUDDYBOX_ORCHESTRATOR_SECRET)) {
     return new Response("Unauthorized", { status: 401 });
   }
   const declaredLength = Number(request.headers.get("content-length") ?? "0");
@@ -94,7 +94,7 @@ export async function orchestrateRun(
       "content-type": "application/x-ndjson; charset=utf-8",
       "cache-control": "no-store",
       "x-content-type-options": "nosniff",
-      "x-ichef-protocol-version": "2026-08-13",
+      "x-buddybox-protocol-version": "2026-08-13",
     },
   });
 }

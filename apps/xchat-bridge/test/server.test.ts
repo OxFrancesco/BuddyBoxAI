@@ -37,7 +37,7 @@ describe("HTTP boundary", () => {
   });
 
   test("rejects a captured exact body across handler restart before bridge decryption", async () => {
-    const directory = await mkdtemp(join(tmpdir(), "ichef-xchat-replay-"));
+    const directory = await mkdtemp(join(tmpdir(), "buddybox-xchat-replay-"));
     const path = join(directory, "vault.json");
     const vaultKey = Buffer.alloc(32, 12).toString("base64");
     const body = JSON.stringify({ data: { event_uuid: "event-replayed" } });

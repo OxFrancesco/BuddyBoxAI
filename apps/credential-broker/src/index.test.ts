@@ -63,7 +63,7 @@ describe("credential broker boundaries", () => {
       "https://broker.example/v1/egress/openai-codex/backend-api/codex/responses",
       {
         method: "POST",
-        headers: { "x-ichef-run-capability": "run-capability" },
+        headers: { "x-buddybox-run-capability": "run-capability" },
         body: new Blob([oversized]).stream(),
       },
     );
@@ -180,7 +180,7 @@ function githubEnv() {
     },
     CONVEX_CREDENTIAL_URL: "https://convex.example/v1/credentials/codex",
     CONVEX_GITHUB_CREDENTIAL_URL: "https://convex.example/v1/credentials/github",
-    ICHEF_CREDENTIAL_BROKER_SECRET: "broker-secret-at-least-thirty-two-characters",
+    BUDDYBOX_CREDENTIAL_BROKER_SECRET: "broker-secret-at-least-thirty-two-characters",
     GITHUB_APP_ID: "1234",
     GITHUB_APP_PRIVATE_KEY: "test-private-key",
   } as never;

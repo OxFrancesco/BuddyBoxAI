@@ -1,9 +1,9 @@
-# iChef X Chat bridge
+# BuddyBox X Chat bridge
 
 Production boundary for encrypted X Chat. It accepts X webhook CRC and signed
 POST requests, decrypts with the official Chat XDK, admits only
 signature-verified text into Convex, binds the X sender to a Clerk user through
-the same `ICHEF-<code>` return-message challenge as iMessage, and delivers
+the same `BUDDYBOX-<code>` return-message challenge as iMessage, and delivers
 leased replies with durable provider idempotency.
 
 ## Security model
@@ -33,11 +33,11 @@ leased replies with durable provider idempotency.
 ## Identity binding
 
 An unbound verified sender receives an expiring
-`https://ichef.buddytools.org/connect/xchat?claim=...` URL. After Clerk attaches
+`https://buddybox.buddytools.org/connect/xchat?claim=...` URL. After Clerk attaches
 that claim and displays a short code, the same X account sends exactly
-`ICHEF-<code>`. Convex compares the code hash and sender hash and consumes the
+`BUDDYBOX-<code>`. Convex compares the code hash and sender hash and consumes the
 challenge atomically. Google remains the general Clerk login; the X OAuth token
-here is only the iChef bot's user-context authorization.
+here is only the BuddyBox bot's user-context authorization.
 
 The bridge creates the claim token and commits the exact claim-reply intent to
 its encrypted vault before Convex admission. Convex receives only the token
@@ -68,7 +68,7 @@ shared store.
 ## Control-plane operations
 
 All requests are `{ operation, input }` to `CONVEX_XCHAT_BROKER_URL`, authorized
-with `Bearer $ICHEF_BRIDGE_SECRET`:
+with `Bearer $BUDDYBOX_BRIDGE_SECRET`:
 
 - `admit_inbound`
 - `complete_challenge`
@@ -84,7 +84,7 @@ Convex stores only hashes and AES-GCM envelopes. Outbound producers seal
 ```sh
 bun install
 bun run --cwd apps/xchat-bridge verify
-docker build -f apps/xchat-bridge/Dockerfile -t ichef-xchat-bridge .
+docker build -f apps/xchat-bridge/Dockerfile -t buddybox-xchat-bridge .
 ```
 
 Copy `.env.example` into Railway secrets, mount `/data`, deploy one replica,

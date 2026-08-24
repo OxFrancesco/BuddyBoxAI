@@ -1,5 +1,5 @@
 export interface LifecycleAuthEnv {
-  ICHEF_PROTOTYPE_SECRET?: string;
+  BUDDYBOX_PROTOTYPE_SECRET?: string;
 }
 
 export function withLifecycleAuthorization<Env extends LifecycleAuthEnv>(
@@ -16,7 +16,7 @@ async function lifecycleAuthorizationError(
   request: Request,
   env: LifecycleAuthEnv,
 ): Promise<Response | undefined> {
-  const secret = env.ICHEF_PROTOTYPE_SECRET;
+  const secret = env.BUDDYBOX_PROTOTYPE_SECRET;
   if (typeof secret !== "string" || secret.length < 32) {
     return new Response(null, {
       status: 503,

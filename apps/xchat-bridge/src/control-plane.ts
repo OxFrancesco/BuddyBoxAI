@@ -47,7 +47,7 @@ const leaseSchema = z.object({
 
 export class ControlPlaneUnavailableError extends Error {
   constructor(readonly status?: number) {
-    super("The iChef X Chat control plane is unavailable");
+    super("The BuddyBox X Chat control plane is unavailable");
     this.name = "ControlPlaneUnavailableError";
   }
 }
@@ -98,7 +98,7 @@ export class ConvexXChatControlPlane {
         headers: {
           authorization: `Bearer ${this.#secret}`,
           "content-type": "application/json",
-          "user-agent": "ichef-xchat-bridge/0.1",
+          "user-agent": "buddybox-xchat-bridge/0.1",
         },
         body: JSON.stringify({ operation, input }),
         signal: AbortSignal.timeout(10_000),

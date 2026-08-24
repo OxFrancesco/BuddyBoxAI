@@ -3,8 +3,8 @@
 interface __BaseEnv_Env {
 	SITE_ASSETS: R2Bucket;
 	CONVEX_SITE_HOST_URL: "https://wry-meerkat-833.convex.site/v1/site-host/broker";
-	SITES_BASE_DOMAIN: "ichef-sites.buddytools.org";
-	CONTROL_PLANE: Fetcher /* ichef-control-plane */;
+	SITES_BASE_DOMAIN: "buddybox-sites.buddytools.org";
+	CONTROL_PLANE: Fetcher /* buddybox-control-plane */;
 }
 declare namespace Cloudflare {
 	interface GlobalProps {

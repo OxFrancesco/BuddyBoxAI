@@ -255,7 +255,7 @@ export function parseSiteDeployment(value: unknown): SiteDeploymentRequest {
   }
   const hostname = requiredString(body, "hostname", {
     max: 253,
-    pattern: /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?-ichef-sites\.buddytools\.org$/,
+    pattern: /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?-buddybox-sites\.buddytools\.org$/,
   });
   if ((hostname.split(".")[0]?.length ?? 64) > 63) throw new Error("hostname label is too long.");
   return {

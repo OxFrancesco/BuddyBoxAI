@@ -10,16 +10,16 @@ function ManagedHosting() {
   return (
     <main className="connect-page">
       <header className="connect-nav">
-        <Link className="brand" to="/"><BrandMark /><span>iChef</span></Link>
+        <Link className="brand" to="/"><BrandMark /><span>BuddyBox</span></Link>
         <span><Check size={14} /> Included with every project</span>
       </header>
       <section className="connect-card provider-connect-card" aria-labelledby="hosting-heading">
         <div className="connect-icon"><Cloud size={25} /></div>
-        <div className="provider-status is-configured" role="status"><Check size={12} /> Managed by iChef</div>
+        <div className="provider-status is-configured" role="status"><Check size={12} /> Managed by BuddyBox</div>
         <p className="eyebrow">Cloudflare hosting included</p>
         <h1 id="hosting-heading">Ship without another account.</h1>
         <p className="connect-copy">
-          iChef hosts previews and approved releases in its Cloudflare account. You never need to connect
+          BuddyBox hosts previews and approved releases in its Cloudflare account. You never need to connect
           Cloudflare or share a Cloudflare token.
         </p>
         <div className="provider-prerequisites">

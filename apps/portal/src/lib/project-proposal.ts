@@ -35,7 +35,7 @@ export function validateProjectProposalInput(
     errors.name = "Keep the name to 120 characters or fewer.";
   }
 
-  if (!brief) errors.brief = "Describe what you want iChef to make.";
+  if (!brief) errors.brief = "Describe what you want BuddyBox to make.";
   else if (brief.length > PROJECT_BRIEF_MAX_LENGTH) {
     errors.brief = "Keep the brief to 8,000 characters or fewer.";
   }
@@ -59,7 +59,7 @@ export async function buildProjectProposal(
     stack: ["TanStack Start", "Clerk", "Convex"],
     delivery: {
       source: "GitHub",
-      hosting: "iChef managed Cloudflare",
+      hosting: "BuddyBox managed Cloudflare",
       approval: "verified messaging channel",
     },
   });

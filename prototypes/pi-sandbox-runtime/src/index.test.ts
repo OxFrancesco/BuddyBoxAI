@@ -5,7 +5,7 @@ import { withLifecycleAuthorization, type LifecycleAuthEnv } from "./lifecycle-a
 const SECRET = "prototype_shared_secret_at_least_32_chars";
 
 function env(secret: string | null = SECRET): LifecycleAuthEnv {
-  return secret === null ? {} : { ICHEF_PROTOTYPE_SECRET: secret };
+  return secret === null ? {} : { BUDDYBOX_PROTOTYPE_SECRET: secret };
 }
 
 let protectedCalls = 0;

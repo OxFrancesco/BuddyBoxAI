@@ -6,7 +6,7 @@ import type { OutboundPlaintext, PreparedSend, VerifiedInboundText } from "./typ
 import type { SecureVault } from "./vault";
 import { XApiError } from "./x-api";
 
-const CHALLENGE_PATTERN = /^ICHEF[- ]([A-HJ-NP-Z2-9]{6,10})$/i;
+const CHALLENGE_PATTERN = /^BUDDYBOX[- ]([A-HJ-NP-Z2-9]{6,10})$/i;
 
 interface PreparedRecord {
   state: "prepared" | "accepted";
@@ -59,7 +59,7 @@ export class XChatBridge {
     this.#protector = options.protector;
     this.#vault = options.vault;
     this.#addressPepper = options.addressPepper;
-    this.#portalUrl = securePortalUrl(options.portalUrl ?? "https://ichef.buddytools.org");
+    this.#portalUrl = securePortalUrl(options.portalUrl ?? "https://buddybox.buddytools.org");
     this.#claimTokenFactory = options.claimTokenFactory ?? (() => randomToken());
   }
 
@@ -82,7 +82,7 @@ export class XChatBridge {
       await this.#queueDirectReply(
         `challenge:${message.eventUuid}`,
         message.conversationId,
-        "X Chat connected to iChef. Finish connecting ChatGPT, GitHub, and Convex before starting your first project.",
+        "X Chat connected to BuddyBox. Finish connecting ChatGPT, GitHub, and Convex before starting your first project.",
       );
       this.#replay.remember(message.eventUuid);
       return "accepted";
@@ -245,7 +245,7 @@ export class XChatBridge {
     const record: Extract<ClaimDirectReplyRecord, { state: "pending" }> = {
       state: "pending",
       conversationId,
-      text: `Welcome to iChef. Securely connect this X Chat account: ${portal.toString()}`,
+      text: `Welcome to BuddyBox. Securely connect this X Chat account: ${portal.toString()}`,
       claimAdmission: {
         claimTokenHash: await sha256(claimToken),
         claimExpiresAt: Date.now() + CLAIM_TTL_MS,

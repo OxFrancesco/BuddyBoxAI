@@ -355,7 +355,7 @@ function boundedOpaqueRef(value: string, field: string, maximum: number): string
 
 function managedHostname(value: string): string {
   const normalized = boundedOpaqueRef(value, "hostname", 253).toLowerCase();
-  if (normalized !== value || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?-ichef-sites\.buddytools\.org$/.test(normalized)) {
+  if (normalized !== value || !/^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?-buddybox-sites\.buddytools\.org$/.test(normalized)) {
     throw new ConvexError({ code: "INVALID_DEPLOYMENT", message: "hostname is invalid" });
   }
   return normalized;

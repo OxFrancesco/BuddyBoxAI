@@ -1,21 +1,21 @@
-# `@ichef/contracts`
+# `@buddybox/contracts`
 
-The shared iChef contract module is the seam between the portal, Convex control
+The shared BuddyBox contract module is the seam between the portal, Convex control
 plane, iMessage bridge, trusted Agent Gateway, and disposable Pi Sandbox. It
 contains data and validation only. It does not perform storage, networking,
 authentication, or provider calls.
 
 ## Interface
 
-`@ichef/contracts/domain` exports the canonical domain schemas and inferred
+`@buddybox/contracts/domain` exports the canonical domain schemas and inferred
 types from `CONTEXT.md`. `evaluateProjectReadiness` is the single eligibility
 rule for starting a Project: the same User must own a verified messaging
 connection (iMessage or X Chat) and healthy ChatGPT, GitHub, and Convex Service
-Connections. Cloudflare is operated centrally by iChef rather than connected by
+Connections. Cloudflare is operated centrally by BuddyBox rather than connected by
 each User. OpenRouter remains an optional fallback and does not make a User
 Project-ready by itself.
 
-`@ichef/contracts/runtime` exports version 1 of the trusted Agent Gateway ↔ Pi
+`@buddybox/contracts/runtime` exports version 1 of the trusted Agent Gateway ↔ Pi
 Sandbox protocol:
 
 - `runtimeCommandSchema` admits, cancels, replaces/resumes, checkpoints,

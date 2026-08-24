@@ -17,7 +17,7 @@ test("project readiness rejects expired or mismatched provider credentials", asy
   const t = convexTest(schema, modules);
   const authenticated = t.withIdentity({
     subject: "readiness-user",
-    tokenIdentifier: "https://issuer.ichef.test|readiness-user",
+    tokenIdentifier: "https://issuer.buddybox.test|readiness-user",
   });
   const user = await authenticated.mutation(api.users.syncCurrent, {});
   const now = Date.now();

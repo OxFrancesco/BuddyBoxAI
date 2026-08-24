@@ -44,7 +44,7 @@ function ConnectXChat() {
   return (
     <main className="connect-page connect-page--xchat">
       <header className="connect-nav">
-        <Link className="brand" to="/"><BrandMark /><span>iChef</span></Link>
+        <Link className="brand" to="/"><BrandMark /><span>BuddyBox</span></Link>
         <span><ShieldCheck size={14} /> Google identity · Clerk-bound claim</span>
       </header>
       <section className="connect-card">
@@ -54,11 +54,11 @@ function ConnectXChat() {
         {!claim ? (
           <>
             <div className="connect-notice is-warning">
-              X Chat claims become available after the iChef operator activates the X developer app,
+              X Chat claims become available after the BuddyBox operator activates the X developer app,
               encrypted bridge, and webhook. Production credentials are not configured in this portal.
             </div>
             <p className="connect-copy">
-              Once activated, message the official iChef account in X Chat. Its private reply will contain
+              Once activated, message the official BuddyBox account in X Chat. Its private reply will contain
               a one-use, 15-minute connection link that returns you here.
             </p>
           </>
@@ -67,12 +67,12 @@ function ConnectXChat() {
             <span>Reply in the same X Chat conversation with exactly</span>
             <button
               type="button"
-              onClick={() => void navigator.clipboard.writeText(`ICHEF-${result.challengeCode}`)}
+              onClick={() => void navigator.clipboard.writeText(`BUDDYBOX-${result.challengeCode}`)}
             >
-              ICHEF-{result.challengeCode} <Copy size={16} />
+              BUDDYBOX-{result.challengeCode} <Copy size={16} />
             </button>
             <small>This one-use code expires at {new Date(result.expiresAt).toLocaleTimeString()}.</small>
-            <p><Check size={16} /> Keep this page open until iChef confirms the connection in X Chat.</p>
+            <p><Check size={16} /> Keep this page open until BuddyBox confirms the connection in X Chat.</p>
           </div>
         ) : (
           <>
@@ -91,7 +91,7 @@ function ConnectXChat() {
               </Button>
             </Show>
             {status === "failed" ? (
-              <div className="connect-notice is-error">This link is invalid, expired, or already used. Ask iChef for a new one in X Chat.</div>
+              <div className="connect-notice is-error">This link is invalid, expired, or already used. Ask BuddyBox for a new one in X Chat.</div>
             ) : null}
           </>
         )}

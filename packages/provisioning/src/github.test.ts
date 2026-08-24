@@ -48,7 +48,7 @@ describe("GitHub App provisioning", () => {
       owner: { kind: "user", login: "chef" },
       userAccessToken: "ghu_ephemeral",
       name: "first-dish",
-      description: "Created by iChef",
+      description: "Created by BuddyBox",
       visibility: "private",
     });
 
@@ -108,8 +108,8 @@ describe("GitHub App provisioning", () => {
   });
 
   test("builds the least-privilege installation URL", () => {
-    expect(githubInstallationUrl("ichef-agent", "state-token")).toBe(
-      "https://github.com/apps/ichef-agent/installations/new?state=state-token",
+    expect(githubInstallationUrl("buddybox-agent", "state-token")).toBe(
+      "https://github.com/apps/buddybox-agent/installations/new?state=state-token",
     );
   });
 
