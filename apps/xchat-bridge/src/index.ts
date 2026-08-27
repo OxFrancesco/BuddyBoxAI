@@ -6,6 +6,7 @@ import { EnvelopeProtector } from "./crypto";
 import { logBridgeEvent } from "./logger";
 import { UserContextTokenProvider } from "./oauth";
 import { createRequestHandler } from "./server";
+import { classifyStartupFailure } from "./startup";
 import { WebhookReplayAdmission } from "./replay";
 import { EncryptedFileVault } from "./vault";
 import { XApiClient } from "./x-api";
@@ -88,7 +89,8 @@ async function main(): Promise<void> {
 
 try {
   await main();
-} catch {
-  logBridgeEvent("error", "initialization_failed", { errorCode: "xchat_initialization_failed" });
-  process.exitCode = 1;
+} catch (error: unknown) {
+  const failure = classifyStartupFailure(error);
+  logBridgeEvent("error", "initialization_failed", { errorCode: failure.errorCode });
+  process.exitCode = failure.exitCode;
 }
