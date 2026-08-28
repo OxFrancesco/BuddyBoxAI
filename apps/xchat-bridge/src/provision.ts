@@ -9,19 +9,15 @@ const meResponseSchema = z.object({
 });
 const publicKeysResponseSchema = z.object({
   data: z.array(z.object({
-    public_key_version: z.string().min(1),
-    public_key: z.string().min(1),
-    signing_public_key: z.string().min(1),
-    identity_public_key_signature: z.string().min(1),
-    juicebox_config: z.record(z.string(), z.unknown()),
-  })),
+    public_key_version: z.string().regex(/^[1-9]\d*$/),
+  }).catchall(z.unknown())),
 });
 const webhooksResponseSchema = z.object({
   data: z.array(z.object({
     id: snowflakeSchema,
     url: z.string().url(),
     valid: z.boolean(),
-  })),
+  })).default([]),
 });
 const webhookSchema = z.object({
   id: snowflakeSchema,
@@ -38,7 +34,7 @@ const subscriptionSchema = z.object({
   webhook_id: snowflakeSchema.optional(),
 });
 const subscriptionsResponseSchema = z.object({
-  data: z.array(subscriptionSchema),
+  data: z.array(subscriptionSchema).default([]),
   meta: z.object({ next_token: z.string().min(1).optional() }).catchall(z.unknown()).optional(),
 });
 const createSubscriptionResponseSchema = z.union([
@@ -383,7 +379,7 @@ async function provisionSubscription(
   const created = await requestJson({
     fetcher,
     url: "https://api.x.com/2/activity/subscriptions",
-    token: appBearerToken,
+    token: accessToken,
     method: "POST",
     body: {
       event_type: "chat.received",

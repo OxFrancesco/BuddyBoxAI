@@ -76,6 +76,32 @@ describe("X Chat provisioning", () => {
     ]);
   });
 
+  test("identity status accepts legacy account keys without Juicebox recovery material", async () => {
+    const result = await provisionXChat({
+      phase: "identity",
+      env: baseEnv,
+      identityVerification: async () => ({ publicKeyVersion: "8" }),
+      fetcher: async (input) => String(input).endsWith("/2/users/me")
+        ? Response.json({ data: { id: "2244994945", username: "BuddyBoxAI" } })
+        : Response.json({ data: [
+            { public_key_version: "7", public_key: "legacy-public-key", juicebox_config: null },
+            { public_key_version: "8", public_key: "current-public-key" },
+          ] }),
+    });
+
+    expect(result).toEqual({
+      status: "ready",
+      requestedPhase: "identity",
+      phases: [{
+        phase: "identity",
+        status: "ready",
+        userId: "2244994945",
+        username: "BuddyBoxAI",
+        publicKeyVersions: ["7", "8"],
+      }],
+    });
+  });
+
   test("rejects a non-numeric users/me identity at the JSON boundary without exposing credentials", async () => {
     const calls: string[] = [];
     const result = await provisionXChat({
@@ -439,7 +465,7 @@ describe("X Chat provisioning", () => {
   });
 
   test("subscription provisioning creates the exact chat.received filter instead of reusing a near match", async () => {
-    const posts: unknown[] = [];
+    const posts: Array<{ authorization: string | null; body: unknown }> = [];
     const result = await provisionXChat({
       phase: "subscription",
       env: baseEnv,
@@ -463,7 +489,10 @@ describe("X Chat provisioning", () => {
             meta: { result_count: 1 },
           });
         }
-        posts.push(JSON.parse(await request.text()));
+        posts.push({
+          authorization: request.headers.get("authorization"),
+          body: JSON.parse(await request.text()),
+        });
         return Response.json({
           data: {
             subscription_id: "403",
@@ -488,10 +517,13 @@ describe("X Chat provisioning", () => {
       }],
     });
     expect(posts).toEqual([{
-      event_type: "chat.received",
-      filter: { user_id: "2244994945" },
-      tag: "buddybox-xchat",
-      webhook_id: "303",
+      authorization: "Bearer user-token-secret",
+      body: {
+        event_type: "chat.received",
+        filter: { user_id: "2244994945" },
+        tag: "buddybox-xchat",
+        webhook_id: "303",
+      },
     }]);
   });
 
@@ -552,6 +584,9 @@ describe("X Chat provisioning", () => {
         methods.push(request.method);
         if (request.url.endsWith("/2/users/me")) {
           return Response.json({ data: { id: "2244994945", username: "BuddyBoxAI" } });
+        }
+        if (request.url.endsWith("/2/webhooks")) {
+          return Response.json({ meta: { result_count: 0 } });
         }
         return Response.json({ data: [] });
       },
