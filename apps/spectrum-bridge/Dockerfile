@@ -5,9 +5,12 @@ WORKDIR /app
 ENV NODE_ENV=production
 
 # Railway builds this Dockerfile with the repository root as its context.
-COPY . .
-RUN bun install --frozen-lockfile --production --filter @buddybox/spectrum-bridge
+# Keep the bridge image independent from the monorepo workspace lockfile so a
+# clean Linux build installs only the runtime dependencies this service needs.
+COPY apps/spectrum-bridge/package.json ./package.json
+RUN bun install --production
+COPY apps/spectrum-bridge/src ./src
 
 USER bun
 EXPOSE 3000
-CMD ["bun", "apps/spectrum-bridge/src/index.ts"]
+CMD ["bun", "src/index.ts"]
