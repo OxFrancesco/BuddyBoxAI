@@ -7,6 +7,5 @@ COPY apps/xchat-bridge/package.json ./package.json
 RUN bun install --production
 COPY apps/xchat-bridge/src ./src
 
-USER bun
 EXPOSE 3000
-CMD ["bun", "src/index.ts"]
+CMD ["bun", "src/docker-entrypoint.ts"]
