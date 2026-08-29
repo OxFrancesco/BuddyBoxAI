@@ -2,7 +2,7 @@ import { createChat, type ChatWithJuicebox, type ConversationKeyMap, type Event,
 import { z } from "zod";
 
 import type { SecureVault } from "./vault";
-import type { PreparedSend, VerifiedInboundText } from "./types";
+import type { PreparedSend, VerifiedInboundText, XChatEventPage } from "./types";
 import type { XApiClient } from "./x-api";
 
 const liveEventSchema = z.object({
@@ -119,6 +119,39 @@ export class XChatEngine {
     }
     const event = this.#chat.decryptEvent(payload.encoded_event, verifiedKeys, signingKeys);
     return normalizeVerifiedText(event, eventUuid, payload.conversation_id, payload.conversation_key_change_event);
+  }
+
+  async decryptPage(page: XChatEventPage): Promise<VerifiedInboundText[]> {
+    if (page.events.length === 0) return [];
+    const senderIds = [...new Set([this.#botUserId, ...page.events.map((event) => event.senderId)])];
+    const signingKeys = await this.#signingKeys(senderIds);
+    this.#chat.setSigningKeys(signingKeys);
+    const batch = this.#chat.decryptEvents([
+      ...page.conversationKeyEvents,
+      ...page.events.map((event) => event.encodedEvent),
+    ], signingKeys);
+    const conversationIds = [...new Set(page.events.map((event) => event.conversationId))];
+    for (const conversationId of conversationIds) {
+      const stored = await this.#loadConversationKeys(conversationId);
+      await this.#storeConversationKeys(conversationId, {
+        ...stored,
+        ...batch.conversationKeys.keys,
+      });
+    }
+
+    const messages: VerifiedInboundText[] = [];
+    for (const item of page.events) {
+      try {
+        const keys = await this.#loadConversationKeys(item.conversationId);
+        const event = this.#chat.decryptEvent(item.encodedEvent, keys, signingKeys);
+        const message = normalizeVerifiedText(event, item.id, item.conversationId);
+        if (message) messages.push(message);
+      } catch {
+        // Invalid signatures and undecryptable historical records are permanent
+        // for this exact provider event. The inbox marks the outer event seen.
+      }
+    }
+    return messages;
   }
 
   async prepareText(conversationId: string, text: string): Promise<PreparedSend> {

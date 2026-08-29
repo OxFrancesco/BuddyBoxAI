@@ -25,7 +25,7 @@ describe("X Chat provisioning", () => {
 
     expect(command).toEqual({
       exitCode: 1,
-      output: '{"status":"error","code":"invalid_phase","allowedPhases":["status","identity","identity-rotate","webhook","subscription","all"]}\n',
+      output: '{"status":"error","code":"invalid_phase","allowedPhases":["status","identity","identity-rotate","subscription","all"]}\n',
     });
     expect(calls).toBe(0);
   });
@@ -420,7 +420,7 @@ describe("X Chat provisioning", () => {
     expect(calls).toBe(1);
   });
 
-  test("subscription provisioning reuses the exact chat.received user and webhook subscription", async () => {
+  test("subscription provisioning reuses the direct stream subscriptions", async () => {
     const requests: Array<{ url: string; authorization: string | null }> = [];
     const result = await provisionXChat({
       phase: "subscription",
@@ -431,15 +431,10 @@ describe("X Chat provisioning", () => {
         if (request.url.endsWith("/2/users/me")) {
           return Response.json({ data: { id: "2244994945", username: "BuddyBoxAI" } });
         }
-        if (request.url.endsWith("/2/webhooks")) {
-          return Response.json({
-            data: [{ id: "303", url: baseEnv.X_WEBHOOK_URL, valid: true }],
-          });
-        }
         return Response.json({
           data: [
-            { subscription_id: "401", event_type: "chat.received", filter: { user_id: "2244994945" }, tag: "wrong-tag", webhook_id: "303" },
-            { subscription_id: "402", event_type: "chat.received", filter: { user_id: "2244994945" }, tag: "buddybox-xchat", webhook_id: "303" },
+            { subscription_id: "401", event_type: "chat.received", filter: { user_id: "2244994945" } },
+            { subscription_id: "402", event_type: "chat.conversation.join", filter: { user_id: "2244994945" } },
           ],
           meta: { result_count: 2 },
         });
@@ -452,19 +447,18 @@ describe("X Chat provisioning", () => {
       phases: [{
         phase: "subscription",
         status: "ready",
-        subscriptionId: "402",
+        subscriptionIds: ["401", "402"],
+        eventTypes: ["chat.received", "chat.conversation.join"],
         userId: "2244994945",
-        webhookId: "303",
       }],
     });
     expect(requests).toEqual([
       { url: "https://api.x.com/2/users/me", authorization: "Bearer user-token-secret" },
-      { url: "https://api.x.com/2/webhooks", authorization: "Bearer app-token-secret" },
-      { url: "https://api.x.com/2/activity/subscriptions", authorization: "Bearer app-token-secret" },
+      { url: "https://api.x.com/2/activity/subscriptions", authorization: "Bearer user-token-secret" },
     ]);
   });
 
-  test("subscription provisioning creates the exact chat.received filter instead of reusing a near match", async () => {
+  test("subscription provisioning creates both non-webhook activity subscriptions", async () => {
     const posts: Array<{ authorization: string | null; body: unknown }> = [];
     const result = await provisionXChat({
       phase: "subscription",
@@ -474,17 +468,12 @@ describe("X Chat provisioning", () => {
         if (request.url.endsWith("/2/users/me")) {
           return Response.json({ data: { id: "2244994945", username: "BuddyBoxAI" } });
         }
-        if (request.url.endsWith("/2/webhooks")) {
-          return Response.json({ data: [{ id: "303", url: baseEnv.X_WEBHOOK_URL, valid: true }] });
-        }
         if (request.method === "GET") {
           return Response.json({
             data: [{
               subscription_id: "402",
               event_type: "chat.received",
               filter: { user_id: "2244994945", direction: "inbound" },
-              tag: "buddybox-xchat",
-              webhook_id: "303",
             }],
             meta: { result_count: 1 },
           });
@@ -493,15 +482,12 @@ describe("X Chat provisioning", () => {
           authorization: request.headers.get("authorization"),
           body: JSON.parse(await request.text()),
         });
-        return Response.json({
-          data: {
-            subscription_id: "403",
-            event_type: "chat.received",
-            filter: { user_id: "2244994945" },
-            tag: "buddybox-xchat",
-            webhook_id: "303",
-          },
-        });
+        const body = posts.at(-1)!.body as { event_type: string };
+        return Response.json({ data: {
+          subscription_id: body.event_type === "chat.received" ? "403" : "404",
+          event_type: body.event_type,
+          filter: { user_id: "2244994945" },
+        } });
       },
     });
 
@@ -511,62 +497,21 @@ describe("X Chat provisioning", () => {
       phases: [{
         phase: "subscription",
         status: "created",
-        subscriptionId: "403",
+        subscriptionIds: ["403", "404"],
+        eventTypes: ["chat.received", "chat.conversation.join"],
         userId: "2244994945",
-        webhookId: "303",
       }],
     });
-    expect(posts).toEqual([{
-      authorization: "Bearer user-token-secret",
-      body: {
-        event_type: "chat.received",
-        filter: { user_id: "2244994945" },
-        tag: "buddybox-xchat",
-        webhook_id: "303",
+    expect(posts).toEqual([
+      {
+        authorization: "Bearer user-token-secret",
+        body: { event_type: "chat.received", filter: { user_id: "2244994945" } },
       },
-    }]);
-  });
-
-  test("subscription provisioning searches every bounded page before deciding to create", async () => {
-    const requests: string[] = [];
-    const result = await provisionXChat({
-      phase: "subscription",
-      env: baseEnv,
-      fetcher: async (input) => {
-        const url = new URL(String(input));
-        requests.push(url.toString());
-        if (url.pathname.endsWith("/users/me")) {
-          return Response.json({ data: { id: "2244994945", username: "BuddyBoxAI" } });
-        }
-        if (url.pathname.endsWith("/webhooks")) {
-          return Response.json({ data: [{ id: "303", url: baseEnv.X_WEBHOOK_URL, valid: true }] });
-        }
-        if (!url.searchParams.has("pagination_token")) {
-          return Response.json({ data: [], meta: { next_token: "page-two" } });
-        }
-        expect(url.searchParams.get("pagination_token")).toBe("page-two");
-        return Response.json({ data: [{
-          subscription_id: "499",
-          event_type: "chat.received",
-          filter: { user_id: "2244994945" },
-          tag: "buddybox-xchat",
-          webhook_id: "303",
-        }] });
+      {
+        authorization: "Bearer user-token-secret",
+        body: { event_type: "chat.conversation.join", filter: { user_id: "2244994945" } },
       },
-    });
-
-    expect(result).toEqual({
-      status: "ready",
-      requestedPhase: "subscription",
-      phases: [{
-        phase: "subscription",
-        status: "ready",
-        subscriptionId: "499",
-        userId: "2244994945",
-        webhookId: "303",
-      }],
-    });
-    expect(requests.filter((url) => url.includes("/activity/subscriptions"))).toHaveLength(2);
+    ]);
   });
 
   test("status inspects every phase without generating keys or creating X resources", async () => {
@@ -585,9 +530,6 @@ describe("X Chat provisioning", () => {
         if (request.url.endsWith("/2/users/me")) {
           return Response.json({ data: { id: "2244994945", username: "BuddyBoxAI" } });
         }
-        if (request.url.endsWith("/2/webhooks")) {
-          return Response.json({ meta: { result_count: 0 } });
-        }
         return Response.json({ data: [] });
       },
     });
@@ -604,16 +546,14 @@ describe("X Chat provisioning", () => {
           username: "BuddyBoxAI",
           publicKeyVersions: [],
         },
-        { phase: "webhook", status: "blocked", code: "webhook_missing", url: baseEnv.X_WEBHOOK_URL },
-        { phase: "subscription", status: "blocked", code: "webhook_required" },
+        { phase: "subscription", status: "blocked", code: "subscription_missing" },
       ],
     });
     expect(identityRegistrationCalls).toBe(0);
     expect(methods.every((method) => method === "GET")).toBe(true);
   });
 
-  test("all provisions webhook and subscription but never treats it as an identity setup phase", async () => {
-    let webhookExists = false;
+  test("all provisions direct Activity stream subscriptions without setting up identity", async () => {
     let identityRegistrationCalls = 0;
     const result = await provisionXChat({
       phase: "all",
@@ -637,24 +577,14 @@ describe("X Chat provisioning", () => {
             juicebox_config: { realms: ["durable"] },
           }] });
         }
-        if (request.url.endsWith("/2/webhooks")) {
-          if (request.method === "POST") {
-            webhookExists = true;
-            return Response.json({ data: { id: "303", url: baseEnv.X_WEBHOOK_URL, valid: true } });
-          }
-          return Response.json({
-            data: webhookExists ? [{ id: "303", url: baseEnv.X_WEBHOOK_URL, valid: true }] : [],
-          });
-        }
         if (request.method === "GET") return Response.json({ data: [], meta: { result_count: 0 } });
+        const body = await request.json() as { event_type: string };
         return Response.json({
           data: {
             subscription: {
-              subscription_id: "403",
-              event_type: "chat.received",
+              subscription_id: body.event_type === "chat.received" ? "403" : "404",
+              event_type: body.event_type,
               filter: { user_id: "2244994945" },
-              tag: "buddybox-xchat",
-              webhook_id: "303",
             },
           },
         });
@@ -673,17 +603,11 @@ describe("X Chat provisioning", () => {
           publicKeyVersions: ["7"],
         },
         {
-          phase: "webhook",
-          status: "created",
-          webhookId: "303",
-          url: baseEnv.X_WEBHOOK_URL,
-        },
-        {
           phase: "subscription",
           status: "created",
-          subscriptionId: "403",
+          subscriptionIds: ["403", "404"],
+          eventTypes: ["chat.received", "chat.conversation.join"],
           userId: "2244994945",
-          webhookId: "303",
         },
       ],
     });

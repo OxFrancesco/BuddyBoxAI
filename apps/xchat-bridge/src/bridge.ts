@@ -66,6 +66,10 @@ export class XChatBridge {
   async acceptWebhookPayload(payload: unknown): Promise<"accepted" | "duplicate" | "ignored"> {
     const message = await this.#engine.decryptLive(payload);
     if (!message) return "ignored";
+    return await this.acceptInboundMessage(message);
+  }
+
+  async acceptInboundMessage(message: VerifiedInboundText): Promise<"accepted" | "duplicate" | "ignored"> {
     if (this.#replay.has(message.eventUuid)) return "duplicate";
 
     const senderIdHash = await keyedHash(this.#addressPepper, message.senderId);
@@ -198,7 +202,7 @@ export class XChatBridge {
     if (!record) {
       record = { state: "pending", conversationId, text };
       // Commit the exact reply intent before asking the SDK to mint its
-      // ciphertext. If preparation fails, a duplicate webhook can still
+      // ciphertext. If preparation fails, a duplicate provider event can still
       // recover the one-time claim URL that Convex deliberately omits.
       await this.#vault.put("direct_reply", id, record);
     }

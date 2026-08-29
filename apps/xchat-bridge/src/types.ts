@@ -15,6 +15,19 @@ export interface VerifiedInboundText {
   keyChangeEvent?: string;
 }
 
+export interface XChatEventRecord {
+  id: string;
+  senderId: string;
+  conversationId: string;
+  encodedEvent: string;
+  createdAt?: string;
+}
+
+export interface XChatEventPage {
+  events: XChatEventRecord[];
+  conversationKeyEvents: string[];
+}
+
 export interface InboundAdmission {
   senderIdHash: string;
   providerConversationIdHash: string;

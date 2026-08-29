@@ -3,7 +3,10 @@ export type LogEvent =
   | "bridge_stopped"
   | "configuration_failed"
   | "initialization_failed"
-  | "outbound_poll_failed";
+  | "outbound_poll_failed"
+  | "inbox_poll_failed"
+  | "activity_stream_failed"
+  | "activity_subscription_failed";
 
 export function logBridgeEvent(
   level: "info" | "error",

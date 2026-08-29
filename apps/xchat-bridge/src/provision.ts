@@ -25,7 +25,6 @@ const webhookSchema = z.object({
   valid: z.boolean(),
 });
 const createWebhookResponseSchema = z.object({ data: webhookSchema });
-const SUBSCRIPTION_TAG = "buddybox-xchat";
 const subscriptionSchema = z.object({
   subscription_id: snowflakeSchema,
   event_type: z.string().min(1),
@@ -127,14 +126,14 @@ type SubscriptionPhaseResult =
   | {
       phase: "subscription";
       status: "ready" | "created";
-      subscriptionId: string;
+      subscriptionIds: string[];
+      eventTypes: string[];
       userId: string;
-      webhookId: string;
     }
   | {
       phase: "subscription";
       status: "blocked";
-      code: "oauth_identity_mismatch" | "webhook_required" | "subscription_missing";
+      code: "oauth_identity_mismatch" | "subscription_missing";
     };
 
 type ProvisioningErrorResult = {
@@ -175,9 +174,8 @@ async function provisionXChatUnsafe(options: ProvisionXChatOptions): Promise<Pro
       ...(options.identityVerification ? { identityVerification: options.identityVerification } : {}),
     };
     const identity = await provisionXChat(identityOptions);
-    const webhook = await provisionWebhook(options, requestedPhase === "all");
     const subscription = await provisionSubscription(options, requestedPhase === "all");
-    const phases = [...identity.phases, ...webhook.phases, ...subscription.phases];
+    const phases = [...identity.phases, ...subscription.phases];
     return { status: summarize(phases), requestedPhase, phases };
   }
   if (options.phase === "webhook") return await provisionWebhook(options, true);
@@ -318,8 +316,7 @@ async function provisionSubscription(
 ): Promise<ProvisionXChatResult> {
   const fetcher = options.fetcher ?? fetch;
   const accessToken = required(options.env, "X_OAUTH_ACCESS_TOKEN");
-  const appBearerToken = required(options.env, "X_APP_BEARER_TOKEN");
-  const webhookUrl = requiredHttpsUrl(options.env, "X_WEBHOOK_URL");
+  required(options.env, "X_APP_BEARER_TOKEN");
   const me = await requestJson({
     fetcher,
     url: "https://api.x.com/2/users/me",
@@ -334,38 +331,25 @@ async function provisionSubscription(
       phases: [{ phase: "subscription", status: "blocked", code: "oauth_identity_mismatch" }],
     };
   }
-  const webhooks = await requestJson({
-    fetcher,
-    url: "https://api.x.com/2/webhooks",
-    token: appBearerToken,
-    schema: webhooksResponseSchema,
-  });
-  const webhook = webhooks.data.find((candidate) => candidate.url === webhookUrl && candidate.valid);
-  if (!webhook) {
-    return {
-      status: "blocked",
-      requestedPhase: "subscription",
-      phases: [{ phase: "subscription", status: "blocked", code: "webhook_required" }],
-    };
-  }
-  const subscriptions = await listSubscriptions(fetcher, appBearerToken);
-  const existing = subscriptions.find((subscription) =>
-    subscription.event_type === "chat.received"
-    && subscription.webhook_id === webhook.id
+  const subscriptions = await listSubscriptions(fetcher, accessToken);
+  const eventTypes = ["chat.received", "chat.conversation.join"];
+  const exact = (eventType: string) => subscriptions.find((subscription) =>
+    subscription.event_type === eventType
     && subscription.filter.user_id === me.data.id
-    && subscription.tag === SUBSCRIPTION_TAG
     && Object.keys(subscription.filter).length === 1
+    && subscription.webhook_id === undefined
   );
-  if (existing) {
+  const existing = eventTypes.map(exact);
+  if (existing.every((subscription) => subscription !== undefined)) {
     return {
       status: "ready",
       requestedPhase: "subscription",
       phases: [{
         phase: "subscription",
         status: "ready",
-        subscriptionId: existing.subscription_id,
+        subscriptionIds: existing.map((subscription) => subscription!.subscription_id),
+        eventTypes,
         userId: me.data.id,
-        webhookId: webhook.id,
       }],
     };
   }
@@ -376,36 +360,39 @@ async function provisionSubscription(
       phases: [{ phase: "subscription", status: "blocked", code: "subscription_missing" }],
     };
   }
-  const created = await requestJson({
-    fetcher,
-    url: "https://api.x.com/2/activity/subscriptions",
-    token: accessToken,
-    method: "POST",
-    body: {
-      event_type: "chat.received",
-      filter: { user_id: me.data.id },
-      tag: SUBSCRIPTION_TAG,
-      webhook_id: webhook.id,
-    },
-    schema: createSubscriptionResponseSchema,
-  });
-  const subscription = "subscription" in created.data ? created.data.subscription : created.data;
-  if (
-    subscription.event_type !== "chat.received"
-    || subscription.webhook_id !== webhook.id
-    || subscription.filter.user_id !== me.data.id
-    || subscription.tag !== SUBSCRIPTION_TAG
-    || Object.keys(subscription.filter).length !== 1
-  ) throw new ProvisioningBoundaryError();
+  const createdIds: string[] = [];
+  for (let index = 0; index < eventTypes.length; index += 1) {
+    if (existing[index]) {
+      createdIds.push(existing[index]!.subscription_id);
+      continue;
+    }
+    const eventType = eventTypes[index]!;
+    const created = await requestJson({
+      fetcher,
+      url: "https://api.x.com/2/activity/subscriptions",
+      token: accessToken,
+      method: "POST",
+      body: { event_type: eventType, filter: { user_id: me.data.id } },
+      schema: createSubscriptionResponseSchema,
+    });
+    const subscription = "subscription" in created.data ? created.data.subscription : created.data;
+    if (
+      subscription.event_type !== eventType
+      || subscription.filter.user_id !== me.data.id
+      || Object.keys(subscription.filter).length !== 1
+      || subscription.webhook_id !== undefined
+    ) throw new ProvisioningBoundaryError();
+    createdIds.push(subscription.subscription_id);
+  }
   return {
     status: "changed",
     requestedPhase: "subscription",
     phases: [{
       phase: "subscription",
       status: "created",
-      subscriptionId: subscription.subscription_id,
+      subscriptionIds: createdIds,
+      eventTypes,
       userId: me.data.id,
-      webhookId: webhook.id,
     }],
   };
 }

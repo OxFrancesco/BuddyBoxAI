@@ -1,6 +1,7 @@
 export interface BridgeConfig {
   port: number;
-  consumerSecret: string;
+  appBearerToken: string;
+  consumerSecret?: string;
   botUserId: string;
   juiceboxPin: string;
   accessToken: string;
@@ -16,6 +17,7 @@ export interface BridgeConfig {
   addressPepper: string;
   vaultPath: string;
   pollIntervalMs: number;
+  inboxPollIntervalMs: number;
 }
 
 export function readConfig(env: Record<string, string | undefined> = process.env): BridgeConfig {
@@ -31,15 +33,17 @@ export function readConfig(env: Record<string, string | undefined> = process.env
   if (decodeBase64(routeEncryptionKey).byteLength !== 32 || decodeBase64(vaultEncryptionKey).byteLength !== 32) {
     throw new Error("Encryption keys must decode to 32 bytes");
   }
-  const consumerSecret = required(env, "X_API_CONSUMER_SECRET");
+  const consumerSecret = optional(env.X_API_CONSUMER_SECRET);
+  const appBearerToken = required(env, "X_APP_BEARER_TOKEN");
   const bridgeSecret = required(env, "BUDDYBOX_BRIDGE_SECRET");
   const addressPepper = required(env, "BUDDYBOX_ADDRESS_PEPPER");
-  if ([consumerSecret, bridgeSecret, addressPepper].some((value) => value.length < 16)) {
+  if ([bridgeSecret, addressPepper, ...(consumerSecret ? [consumerSecret] : [])].some((value) => value.length < 16)) {
     throw new Error("Bridge secrets must be at least 16 characters");
   }
   return {
     port: integer(env.PORT, 3000, 1, 65_535),
-    consumerSecret,
+    appBearerToken,
+    ...(consumerSecret ? { consumerSecret } : {}),
     botUserId: snowflake(required(env, "X_CHAT_USER_ID")),
     juiceboxPin: required(env, "X_CHAT_PIN"),
     accessToken: required(env, "X_OAUTH_ACCESS_TOKEN"),
@@ -55,6 +59,7 @@ export function readConfig(env: Record<string, string | undefined> = process.env
     addressPepper,
     vaultPath: optional(env.XCHAT_VAULT_PATH) ?? "/data/xchat-vault.json",
     pollIntervalMs: integer(env.XCHAT_POLL_INTERVAL_MS, 2_000, 500, 60_000),
+    inboxPollIntervalMs: integer(env.XCHAT_INBOX_POLL_INTERVAL_MS, 60_000, 5_000, 300_000),
   };
 }
 

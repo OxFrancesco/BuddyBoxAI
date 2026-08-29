@@ -1,21 +1,21 @@
 # X Chat API implementation notes
 
-Primary-source review performed 2026-08-14 and refreshed 2026-08-24 against
-the official Chat XDK and xurl recovery implementations.
+Primary-source review performed 2026-08-14 and refreshed 2026-08-28 against
+the official Chat XDK, xurl recovery implementation, TypeScript XDK, and
+`xchat-agent-skeleton`.
 
 - X Chat transports encrypted, signed message events. The Chat XDK is the
   supported encryption/decryption/signature layer, while X API routes carry
   ciphertext and public/wrapped keys. [Introduction](https://docs.x.com/xchat/introduction)
-- Live deliveries use `chat.received`, `chat.sent`, and
-  `chat.conversation_join`. The live message is `payload.encoded_event`; an
-  optional `conversation_key_change_event` must be verified/applied before its
-  dependent message. Deduplicate delivery by `event_uuid` and message by the
-  signed `message_id`. [Real-time events](https://docs.x.com/xchat/real-time-events)
-- Webhook GET CRC is HMAC-SHA256 over `crc_token` with the App consumer secret,
-  base64 encoded and prefixed `sha256=`. POST authenticity is the
-  `x-twitter-webhooks-signature` HMAC over the exact raw body. Webhooks must
-  acknowledge within ten seconds and can deliver duplicates.
-  [Webhook quickstart](https://docs.x.com/x-api/webhooks/quickstart)
+- The official agent skeleton reads the primary inbox through
+  `GET /2/chat/conversations`, hydrates ciphertext and key-change history from
+  `GET /2/chat/conversations/{id}/events`, and uses `GET /2/activity/stream` to
+  discover Message-request threads. X Chat agent delivery is not built around
+  an Account Activity webhook.
+- Direct Activity subscriptions are created for `chat.received` and
+  `chat.conversation.join` with the bot user filter and no webhook ID. The
+  user-context grant manages subscriptions; the app-only bearer reads the
+  stream.
 - Private chat subscriptions require OAuth 2.0 user context (including
   `dm.read`), and sending requires `dm.write`; DM scopes also require
   `users.read` and `tweet.read`. [Real-time events](https://docs.x.com/xchat/real-time-events)
@@ -45,3 +45,9 @@ that record's version. The PIN remains a deployment secret; Juicebox config,
 realm tokens, and key version are not static deployment inputs. Verified
 conversation keys, OAuth refresh state, and prepared outbound ciphertext are
 encrypted again in a persistent local vault.
+
+The delivery loop ports the skeleton's safety behavior: hydrate all available
+history once, reply only to the newest inbound event from the last 48 hours,
+persist seen outer event IDs, then process new events in chronological order.
+Activity notifications trigger an authenticated conversation read instead of
+trusting notification payloads as agent input.

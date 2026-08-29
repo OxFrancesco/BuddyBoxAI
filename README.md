@@ -68,7 +68,8 @@ enabled.
   delivery is therefore not live.
 - The X Chat bridge and first-class Convex/portal connection flow are built, but
   a live X developer application, API credits, OAuth grant, X Chat key registration,
-  Juicebox realm, webhook, and persistent Railway volume are still required.
+  Juicebox realm, direct Activity subscriptions/stream, and persistent Railway
+  volume are still required.
 - Project and run domain APIs, the Pi Sandbox runtime, user-owned GitHub
   provisioning, previews, checkpoints, approvals, release state, and the
   production capability issuer/orchestrator are wired. The live iMessage-to-run

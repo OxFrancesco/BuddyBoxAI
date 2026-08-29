@@ -3,8 +3,8 @@ import { describe, expect, test } from "bun:test";
 import { readConfig } from "../src/config";
 
 const env = {
-  X_API_CONSUMER_SECRET: "consumer_secret_long_enough",
   X_OAUTH_ACCESS_TOKEN: "user_access_token",
+  X_APP_BEARER_TOKEN: "app_bearer_token",
   X_CHAT_USER_ID: "123456",
   X_CHAT_PIN: "safe-pin-value",
   CONVEX_XCHAT_BROKER_URL: "https://example.convex.site/v1/xchat/broker",
@@ -19,6 +19,7 @@ describe("configuration", () => {
     expect(readConfig(env)).toMatchObject({
       port: 3000,
       botUserId: "123456",
+      appBearerToken: "app_bearer_token",
       pollIntervalMs: 2000,
       portalUrl: "https://buddybox.buddytools.org",
     });
@@ -29,6 +30,11 @@ describe("configuration", () => {
     expect(readConfig(env)).not.toHaveProperty("realmTokens");
     expect(readConfig(env)).not.toHaveProperty("juiceboxConfig");
     expect(readConfig(env)).not.toHaveProperty("botKeyVersion");
+  });
+
+  test("does not require an Account Activity webhook secret", () => {
+    expect(() => readConfig(env)).not.toThrow();
+    expect(readConfig(env)).not.toHaveProperty("consumerSecret");
   });
 
   test("rejects malformed encryption material and insecure remote URLs", () => {

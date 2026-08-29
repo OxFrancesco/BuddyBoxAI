@@ -4,7 +4,7 @@ import type { WebhookReplayAdmission, WebhookReplayClaim } from "./replay";
 
 export function createRequestHandler(options: {
   bridge: Pick<XChatBridge, "acceptWebhookPayload">;
-  consumerSecret: string;
+  consumerSecret?: string;
   replay: WebhookReplayAdmission;
   ready?: () => boolean;
 }): (request: Request) => Promise<Response> {
@@ -20,6 +20,7 @@ export function createRequestHandler(options: {
       );
     }
     if (request.method === "GET" && url.pathname === "/v1/xchat/webhook") {
+      if (!options.consumerSecret) return new Response(null, { status: 404 });
       const token = url.searchParams.get("crc_token");
       if (!token) return new Response(null, { status: 400 });
       return Response.json(
@@ -28,6 +29,7 @@ export function createRequestHandler(options: {
       );
     }
     if (request.method === "POST" && url.pathname === "/v1/xchat/webhook") {
+      if (!options.consumerSecret) return new Response(null, { status: 404 });
       const admitted = await acceptXWebhook(request, options.consumerSecret);
       if (!admitted.ok) return new Response(null, { status: admitted.status });
       let claim: WebhookReplayClaim;

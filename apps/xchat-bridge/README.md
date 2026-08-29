@@ -1,25 +1,25 @@
 # BuddyBox X Chat bridge
 
-Production boundary for encrypted X Chat. It accepts X webhook CRC and signed
-POST requests, decrypts with the official Chat XDK, admits only
-signature-verified text into Convex, binds the X sender to a Clerk user through
+Production boundary for encrypted X Chat. It follows the official X Chat agent
+skeleton: it polls the primary inbox, discovers Message-request threads through
+`GET /2/activity/stream`, decrypts event pages with the official Chat XDK, and
+admits only signature-verified text into Convex. It binds the X sender to a
+Clerk user through
 the same `BUDDYBOX-<code>` return-message challenge as iMessage, and delivers
 leased replies with durable provider idempotency.
 
 ## Security model
 
-- `GET /v1/xchat/webhook` answers X's CRC challenge using the App consumer
-  secret. `POST /v1/xchat/webhook` verifies
-  `x-twitter-webhooks-signature` against the exact raw bytes before JSON parse.
-- Webhook bodies are capped at 1 MiB. After signature verification, an
-  encrypted, capacity-bounded exact-body digest ledger claims each body before
-  XDK decryption. Completed captures survive process restart, concurrent copies
-  stop at that cheap boundary, and failed work releases its owned claim so X
-  can retry. Convex also durably deduplicates the hashed `event_uuid` and signed
-  `message_id`; the process replay cache suppresses alternate-body hot
-  duplicates after successful admission.
-- `chat.received` is the only admitted event type. Key-change events are
-  signature checked first. The decrypted event must itself have
+- `GET /2/chat/conversations` supplies the primary inbox. Each watched thread is
+  hydrated through `GET /2/chat/conversations/{id}/events`; first boot processes
+  key history but replies only to the newest recent inbound message.
+- Direct `chat.received` and `chat.conversation.join` subscriptions have no
+  webhook ID. The app-only bearer holds the Activity stream; notifications
+  trigger an authenticated conversation read, including Message-request threads.
+- Event-page IDs are retained in the encrypted vault, and Convex durably
+  deduplicates the hashed provider event ID and signed message ID.
+- Key-change events are signature checked first. The decrypted event must itself
+  have
   `verified === true`, type `message`, and text content.
 - Raw X user IDs and conversation IDs never cross the bridge boundary. Their
   HMAC hashes are stored in Convex. Plaintext is AES-256-GCM encrypted with AAD
@@ -51,8 +51,8 @@ The bridge creates the claim token and commits the exact claim-reply intent to
 its encrypted vault before Convex admission. Convex receives only the token
 hash and expiry; the raw token exists only inside the encrypted bridge record
 and the eventual X ciphertext. Preparation can therefore resume after an
-ambiguous admission response or duplicate webhook without minting another
-claim. The prepared SDK payload is persisted before any send, so all network
+ambiguous admission response or duplicate provider delivery without minting
+another claim. The prepared SDK payload is persisted before any send, so all network
 retries are byte-identical. If the pre-admission commit fails, Convex is not
 called and the one-replica bridge retains the same intent for the provider
 retry.
@@ -95,23 +95,20 @@ bun run --cwd apps/xchat-bridge verify
 docker build -f apps/xchat-bridge/Dockerfile -t buddybox-xchat-bridge .
 ```
 
-Provisioning is an idempotent JSON command with five phases:
+Provisioning is an idempotent JSON command:
 
 ```sh
 bun run --cwd apps/xchat-bridge provision -- status
 bun run --cwd apps/xchat-bridge provision -- identity
 bun run --cwd apps/xchat-bridge provision -- identity-rotate
-bun run --cwd apps/xchat-bridge provision -- webhook
 bun run --cwd apps/xchat-bridge provision -- subscription
 bun run --cwd apps/xchat-bridge provision -- all
 ```
 
-`status` only inspects. `webhook` reuses a registration only when its URL is an
-exact `X_WEBHOOK_URL` match, and `subscription` reuses only the exact
-`chat.received` + bot user + webhook + `buddybox-xchat` tag tuple. X Activity
-listing and creation use the App bearer; the bot's OAuth user grant and scopes
-authorize its private Chat event eligibility. `all` may create the webhook and
-subscription, but never generates or registers identity keys. The explicit
+`status` only inspects. `subscription` reconciles direct `chat.received` and
+`chat.conversation.join` subscriptions for the authenticated bot user, with no
+webhook ID. `all` may create those subscriptions, but never generates or
+registers identity keys. The explicit
 `identity` phase performs the official first-boot sequence: generate a key,
 reconcile it against the account, register it once when absent, fetch the new
 Juicebox config, store the private identity under `X_CHAT_PIN`, and only then
@@ -126,19 +123,18 @@ is never automatic. Run `identity-rotate` only with the one-command environment
 confirmation `X_CHAT_ROTATION_CONFIRM_USER_ID=<exact numeric bot user id>`; this
 deliberately consumes the account's limited public-key registration budget.
 
-Webhook and Activity management use the separate provisioning-only
-`X_APP_BEARER_TOKEN`; the long-running bridge does not read or require it.
+The long-running bridge requires `X_APP_BEARER_TOKEN` for the Activity stream.
+The OAuth user grant manages the direct subscriptions.
 Provider JSON is validated before use, and command failures emit only redacted
 machine-readable codes. Identity status is ready only when the OAuth grant
 resolves to `X_CHAT_USER_ID`, fresh Juicebox material unlocks with the configured
 PIN, and the recovered key matches an account public key. The runtime repeats
 those recovery checks before accepting traffic.
 
-Copy `.env.example` into Railway secrets, mount `/data`, deploy one replica,
-register `https://<railway-host>/v1/xchat/webhook`, then create the
-`chat.received` activity subscription for `X_CHAT_USER_ID`. Production is ready
-only after the X developer App, OAuth user grant, PIN-backed public Chat key
-record, webhook, and subscription exist and `/readyz` succeeds.
+Copy `.env.example` into Railway secrets, mount `/data`, deploy one replica, and
+run `provision -- all`. Production is ready only after the X developer App,
+OAuth user grant, PIN-backed public Chat key record, direct Activity
+subscriptions, stream connection, initial inbox sweep, and `/readyz` success.
 
 Current official sources and implementation conclusions are captured in
 [`docs/xchat-api-research.md`](./docs/xchat-api-research.md).

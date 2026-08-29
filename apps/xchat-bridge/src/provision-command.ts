@@ -7,7 +7,7 @@ import {
 } from "./provision";
 
 type ProvisionPhase = ProvisionXChatOptions["phase"];
-const PHASES: readonly ProvisionPhase[] = ["status", "identity", "identity-rotate", "webhook", "subscription", "all"];
+const PHASES = ["status", "identity", "identity-rotate", "subscription", "all"] as const;
 
 export async function runXChatProvisionCommand(options: {
   args: readonly string[];
@@ -52,7 +52,6 @@ function parsePhase(args: readonly string[]): ProvisionPhase | undefined {
 function isProvisionPhase(value: string): value is ProvisionPhase {
   return value === "status"
     || value === "identity"
-    || value === "webhook"
     || value === "identity-rotate"
     || value === "subscription"
     || value === "all";

@@ -17,5 +17,7 @@ folder to gather information, feedback, patterns, and templates before writing c
 - `resources/cloudflare-sandbox-sdk` — Official Cloudflare Sandbox SDK source, current API types, lifecycle, tunnels, and examples for BuddyBox runtime proof
 - `resources/xurl` — Official X CLI with OAuth and X Chat key restore flows
 - `resources/x-chat-xdk` — Official X Chat encryption SDK including native Juicebox implementation
+- `resources/xchat-agent-skeleton` — Official X Chat agent skeleton with key restoration, encrypted messaging, and agent integration patterns
+- `resources/xdk-typescript` — Official TypeScript X API SDK with X Chat inbox, events, messages, and Activity stream support
 
 <!-- codeview:end -->
